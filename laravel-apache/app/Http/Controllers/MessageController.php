@@ -24,4 +24,15 @@ class MessageController extends Controller
 
         return response()->json($message, 201);
     }
+
+    public function count()
+    {
+        return Message::count();
+    }
+
+    public function deleteAll()
+    {
+        Message::truncate();
+        return response()->json(['message' => 'All messages deleted successfully']);
+    }
 } 

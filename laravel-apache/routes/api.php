@@ -22,4 +22,6 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::middleware('api')->group(function () {
     Route::get('/messages', [MessageController::class, 'index']);
     Route::post('/messages', [MessageController::class, 'store']);
+    Route::get('/messages/count', [MessageController::class, 'count']);
+    Route::delete('/messages', [MessageController::class, 'deleteAll']);
 });

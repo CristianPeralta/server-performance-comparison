@@ -45,6 +45,24 @@ app.get('/api/messages', async (req, res) => {
     }
 });
 
+app.get('/api/messages/count', async (req, res) => {
+    try {
+        const messagesCount = await Message.countDocuments();
+        res.json({ count: messagesCount });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/messages', async (req, res) => {
+    try {
+        await Message.deleteMany();
+        res.json({ message: 'All messages deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Start server
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
