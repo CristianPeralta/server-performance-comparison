@@ -71,12 +71,6 @@ TEST_DATA_JSON="benchmark/test_data.json"
 # Laravel tests
 echo "Starting Laravel tests..."
 
-# GET tests
-for concurrency in "${CONCURRENCY_LEVELS[@]}"; do
-    run_ab_test "laravel" "http://localhost:8000/api/messages" ${concurrency} ${REQUESTS} "GET"
-done
-measure_response_time "laravel" "http://localhost:8000/api/messages" "GET"
-
 # POST tests
 for concurrency in "${CONCURRENCY_LEVELS[@]}"; do
     run_ab_test "laravel" "http://localhost:8000/api/messages" ${concurrency} ${REQUESTS} "POST" "$TEST_DATA_JSON"
@@ -87,12 +81,6 @@ monitor_resources "php" ${RESOURCE_MONITOR_DURATION}
 
 # Node.js tests
 echo "Starting Node.js tests..."
-
-# GET tests
-for concurrency in "${CONCURRENCY_LEVELS[@]}"; do
-    run_ab_test "nodejs" "http://localhost:3000/api/messages" ${concurrency} ${REQUESTS} "GET"
-done
-measure_response_time "nodejs" "http://localhost:3000/api/messages" "GET"
 
 # POST tests
 for concurrency in "${CONCURRENCY_LEVELS[@]}"; do
@@ -120,17 +108,6 @@ for server in "laravel" "nodejs"; do
         resource_file="results/node_resources.txt"
     fi
     read cpu_avg mem_avg < <(extract_resource_usage "$resource_file")
-    
-    # Process GET results
-    echo "GET Requests:" >> results/summary.txt
-    avg_response=$(awk '{ total += $1 } END { print total/NR }' results/${server}_GET_response_time.txt)
-    failed_requests=$(grep "Failed requests" results/${server}_GET_ab_c1.txt | awk '{print $3}')
-    rps=$(grep "Requests per second" results/${server}_GET_ab_c1.txt | awk '{print $4}')
-    echo "  - Tiempo de respuesta promedio: ${avg_response}s" >> results/summary.txt
-    echo "  - Tasa de transferencia: ${rps} requests/segundo" >> results/summary.txt
-    echo "  - Solicitudes fallidas: ${failed_requests}" >> results/summary.txt
-    echo "  - Uso de CPU promedio: ${cpu_avg}%" >> results/summary.txt
-    echo "  - Uso de memoria promedio: ${mem_avg} KiB" >> results/summary.txt
     
     # Process POST results
     avg_response=$(awk '{ total += $1 } END { print total/NR }' results/${server}_POST_response_time.txt)
