@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Configuración
+# Configuration
 REQUESTS=643
 CONCURRENCY=1
 DURATION=60
@@ -10,10 +10,10 @@ CONTENT_TYPE="application/json"
 LARAVEL_URL="http://localhost:8000/api/messages"
 NODE_URL="http://localhost:3000/api/messages"
 
-# Crear carpetas de salida
+# Create output directories
 mkdir -p results
 
-# Función para monitorear uso de recursos por contenedor
+# Function to monitor container resource usage
 monitor_container() {
   local container_name=$1
   local outfile=$2
@@ -26,12 +26,12 @@ monitor_container() {
   done
 }
 
-# Función para correr ab con POST
+# Function to run ab with POST
 run_benchmark() {
   local url=$1
   local outfile=$2
   echo "Testing $url..."
-  # Hace una solicitud HTTP POST a la url especificada, con el contenido de $JSON_PAYLOAD como cuerpo de la solicitud, y con los siguientes parámetros:
+  # Make a HTTP POST request to the specified URL, with the content of $JSON_PAYLOAD as the request body, and with the following parameters:
   #   -n $REQUESTS: hacer $REQUESTS solicitudes
   #   -c $CONCURRENCY: hacer $CONCURRENCY solicitudes concurrentes
   #   -p $JSON_PAYLOAD: leer el cuerpo de la solicitud desde el archivo $JSON_PAYLOAD
@@ -40,7 +40,7 @@ run_benchmark() {
   ab -n $REQUESTS -c $CONCURRENCY -p $JSON_PAYLOAD -T $CONTENT_TYPE $url > $outfile
 }
 
-# Función para analizar resultados de ab
+# Function to extract ab metrics
 extract_ab_metrics() {
   local infile=$1
   local outfile=$2
@@ -53,25 +53,25 @@ extract_ab_metrics() {
   echo "" >> $outfile
 }
 
-# Importar funciones utilitarias
+# Import utility functions
 source utils.sh
 
-# Ejecutar pruebas Laravel
-echo "Iniciando prueba para Laravel..."
+# Run Laravel benchmark
+echo "Starting Laravel benchmark..."
 monitor_container laravel-app results/laravel_usage.csv &
 PID_LARAVEL=$!
 run_benchmark $LARAVEL_URL results/laravel_ab.txt
 wait $PID_LARAVEL
 
-# Ejecutar pruebas Node.js
-echo "Iniciando prueba para Node.js..."
+# Run Node.js benchmark
+echo "Starting Node.js benchmark..."
 monitor_container nodejs-app results/node_usage.csv &
 PID_NODE=$!
 run_benchmark $NODE_URL results/node_ab.txt
 wait $PID_NODE
 
-# Generar resumen
-echo "Generando resumen..."
+# Generate summary
+echo "Generating summary..."
 SUMMARY_FILE="results/summary.txt"
 : > $SUMMARY_FILE
 
@@ -86,4 +86,4 @@ analyze_usage results/node_usage.csv >> $SUMMARY_FILE
 echo "" >> $SUMMARY_FILE
 
 cat $SUMMARY_FILE
-echo "Resumen guardado en $SUMMARY_FILE"
+echo "Summary saved to $SUMMARY_FILE"
