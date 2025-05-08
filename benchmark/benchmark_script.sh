@@ -2,9 +2,9 @@
 
 # Configuración
 REQUESTS=643
-CONCURRENCY=10
+CONCURRENCY=1
 DURATION=60
-JSON_PAYLOAD="test_data.json"
+JSON_PAYLOAD="test_data_message.json"
 CONTENT_TYPE="application/json"
 
 LARAVEL_URL="http://localhost:8000/api/messages"
@@ -21,7 +21,7 @@ monitor_container() {
 
   for i in $(seq 1 $DURATION); do
     # Get stats for each container and append to file
-    docker stats --no-stream --format "{{.CPUPerc}},{{.MemUsage}}" $container_name >> $outfile
+    docker stats --no-stream --format "{{.CPUPerc}},{{.MemPerc}}" $container_name >> $outfile
     sleep 1
   done
 }
@@ -31,6 +31,12 @@ run_benchmark() {
   local url=$1
   local outfile=$2
   echo "Testing $url..."
+  # Hace una solicitud HTTP POST a la url especificada, con el contenido de $JSON_PAYLOAD como cuerpo de la solicitud, y con los siguientes parámetros:
+  #   -n $REQUESTS: hacer $REQUESTS solicitudes
+  #   -c $CONCURRENCY: hacer $CONCURRENCY solicitudes concurrentes
+  #   -p $JSON_PAYLOAD: leer el cuerpo de la solicitud desde el archivo $JSON_PAYLOAD
+  #   -T $CONTENT_TYPE: especificar el tipo de contenido de la solicitud (en este caso, application/json)
+  # La salida se redirige a $outfile
   ab -n $REQUESTS -c $CONCURRENCY -p $JSON_PAYLOAD -T $CONTENT_TYPE $url > $outfile
 }
 
