@@ -32,12 +32,20 @@ run_benchmark() {
   local outfile=$2
   echo "Testing $url..."
   # Make a HTTP POST request to the specified URL, with the content of $JSON_PAYLOAD as the request body, and with the following parameters:
-  #   -n $REQUESTS: hacer $REQUESTS solicitudes
-  #   -c $CONCURRENCY: hacer $CONCURRENCY solicitudes concurrentes
-  #   -p $JSON_PAYLOAD: leer el cuerpo de la solicitud desde el archivo $JSON_PAYLOAD
-  #   -T $CONTENT_TYPE: especificar el tipo de contenido de la solicitud (en este caso, application/json)
-  # La salida se redirige a $outfile
-  ab -n $REQUESTS -c $CONCURRENCY -p $JSON_PAYLOAD -T $CONTENT_TYPE $url > $outfile
+  #   -n $REQUESTS: make $REQUESTS requests
+  #   -c $CONCURRENCY: make $CONCURRENCY concurrent requests
+  #   -p $JSON_PAYLOAD: read the request body from the file $JSON_PAYLOAD
+  #   -T $CONTENT_TYPE: specify the request content type (in this case, application/json)
+  #   -s 60: timeout in seconds (increased)
+  #   -r: don't exit on socket receive errors
+  #   -k: Use HTTP KeepAlive feature
+  #   -d: don't show percentiles served table
+  #   -S: don't show confidence estimators and warnings
+  #   -v 4: verbose output for debugging
+  #   -l: accept variable document length (for dynamic pages)
+  #   -q: don't show progress when doing more than 150 requests
+  # The output is redirected to $outfile
+  ab -n $REQUESTS -c $CONCURRENCY -p $JSON_PAYLOAD -T $CONTENT_TYPE -s 60 -r -k -d -S -v 4 -l -q $url > $outfile
 }
 
 # Function to extract ab metrics
@@ -47,9 +55,14 @@ extract_ab_metrics() {
   local title=$3
 
   echo "=== $title ===" >> $outfile
+  echo "" >> $outfile
+  
+  # Extract key metrics
   grep "Time per request" $infile | head -1 >> $outfile
   grep "Transfer rate" $infile >> $outfile
   grep "Failed requests" $infile >> $outfile
+  grep "Complete requests" $infile >> $outfile
+  grep "Requests per second" $infile >> $outfile
   echo "" >> $outfile
 }
 
