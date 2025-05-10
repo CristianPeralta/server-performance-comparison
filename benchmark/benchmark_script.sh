@@ -24,6 +24,8 @@ monitor_container() {
     docker stats --no-stream --format "{{.CPUPerc}},{{.MemPerc}}" $container_name >> $outfile
     sleep 1
   done
+
+  # TODO: Fix this because its taking more time than 60 seconds
 }
 
 # Function to run ab with POST
@@ -48,6 +50,15 @@ run_benchmark() {
   ab -n $REQUESTS -c $CONCURRENCY -p $JSON_PAYLOAD -T $CONTENT_TYPE -s 60 -r -k -d -S -v 4 -l -q $url > $outfile
 }
 
+run_jmeter() {
+  local url=$1
+  local outfile=$2
+  echo "Testing $url..."
+  local port=$(echo "$url" | sed -nE 's#^[a-z]+://[^:/]+:([0-9]+).*#\1#p')
+  echo "Port: $port"
+  jmeter -n -t test-plan.jmx -l $outfile -Jport=$port > "${outfile%.csv}-resumen.log"
+}
+
 # Function to extract ab metrics
 extract_ab_metrics() {
   local infile=$1
@@ -66,6 +77,10 @@ extract_ab_metrics() {
   echo "" >> $outfile
 }
 
+extract_jmeter_metrics() {
+  # TODO: Extract metrics from jmeter csv
+}
+
 # Import utility functions
 source utils.sh
 
@@ -73,14 +88,17 @@ source utils.sh
 echo "Starting Laravel benchmark..."
 monitor_container laravel-app results/laravel_usage.csv &
 PID_LARAVEL=$!
-run_benchmark $LARAVEL_URL results/laravel_ab.txt
+# TODO: Run ab or jmeter according to the script argument
+# run_benchmark $LARAVEL_URL results/laravel_ab.txt
+run_jmeter $LARAVEL_URL results/laravel_jmeter.csv
 wait $PID_LARAVEL
 
 # Run Node.js benchmark
 echo "Starting Node.js benchmark..."
 monitor_container nodejs-app results/node_usage.csv &
 PID_NODE=$!
-run_benchmark $NODE_URL results/node_ab.txt
+# run_benchmark $NODE_URL results/node_ab.csv
+run_jmeter $NODE_URL results/node_jmeter.csv
 wait $PID_NODE
 
 # Generate summary
@@ -88,12 +106,14 @@ echo "Generating summary..."
 SUMMARY_FILE="results/summary.txt"
 : > $SUMMARY_FILE
 
-extract_ab_metrics results/laravel_ab.txt $SUMMARY_FILE "Laravel + Apache Benchmark"
+# extract_ab_metrics results/laravel_ab.txt $SUMMARY_FILE "Laravel + Apache Benchmark"
+# extract_jmeter_metrics results/laravel_jmeter.csv $SUMMARY_FILE "Laravel + JMeter"
 echo "Laravel Resource Usage:" >> $SUMMARY_FILE
 analyze_usage results/laravel_usage.csv >> $SUMMARY_FILE
 echo "" >> $SUMMARY_FILE
 
-extract_ab_metrics results/node_ab.txt $SUMMARY_FILE "Node.js Benchmark"
+# extract_ab_metrics results/node_ab.txt $SUMMARY_FILE "Node.js Benchmark"
+# extract_jmeter_metrics results/node_jmeter.csv $SUMMARY_FILE "Node.js + JMeter"
 echo "Node.js Resource Usage:" >> $SUMMARY_FILE
 analyze_usage results/node_usage.csv >> $SUMMARY_FILE
 echo "" >> $SUMMARY_FILE
