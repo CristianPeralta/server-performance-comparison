@@ -70,7 +70,6 @@ extract_ab_metrics() {
   
   # Extract key metrics
   grep "Time per request" $infile | head -1 >> $outfile
-  grep "Transfer rate" $infile >> $outfile
   grep "Failed requests" $infile >> $outfile
   grep "Complete requests" $infile >> $outfile
   grep "Requests per second" $infile >> $outfile
@@ -78,7 +77,43 @@ extract_ab_metrics() {
 }
 
 extract_jmeter_metrics() {
-  # TODO: Extract metrics from jmeter csv
+  local infile=$1
+  local outfile=$2
+  local title=$3
+
+  echo "=== $title ===" >> $outfile
+  echo "" >> $outfile
+
+  # Get the final summary line
+  local final_summary=$(grep "summary =" "$infile" | tail -1)
+  
+  if [[ -z "$final_summary" ]]; then
+    echo "No JMeter summary found in $infile" >> "$outfile"
+    echo "" >> "$outfile"
+    return
+  fi
+
+  # Extract values directly using awk for greater precision
+  # Format: summary = 643 in 00:01:00 = 10.7/s Avg: 65 Min: 50 Max: 107 Err: 0 (0.00%)
+  
+  # Total requests - third field
+  local total_requests=$(echo "$final_summary" | awk '{print $3}')
+  
+  # Avg time - field after "Avg:"
+  local avg_time=$(echo "$final_summary" | awk '{for(i=1;i<=NF;i++) if($i=="Avg:") print $(i+1)}')
+  
+  # Requests per second - field before "/s"
+  local rps=$(echo "$final_summary" | awk '{for(i=1;i<=NF;i++) if(index($i,"/s")>0) {gsub("/s","", $i); print $i}}')
+  
+  # Error count - field after "Err:"
+  local error_count=$(echo "$final_summary" | awk '{for(i=1;i<=NF;i++) if($i=="Err:") print $(i+1)}')
+
+  # Output metrics
+  echo "Time per request: ${avg_time} ms" >> "$outfile"
+  echo "Failed requests: ${error_count}" >> "$outfile"
+  echo "Complete requests: ${total_requests}" >> "$outfile"
+  echo "Requests per second: ${rps}" >> "$outfile"
+  echo "" >> "$outfile"
 }
 
 # Import utility functions
@@ -107,13 +142,13 @@ SUMMARY_FILE="results/summary.txt"
 : > $SUMMARY_FILE
 
 # extract_ab_metrics results/laravel_ab.txt $SUMMARY_FILE "Laravel + Apache Benchmark"
-# extract_jmeter_metrics results/laravel_jmeter.csv $SUMMARY_FILE "Laravel + JMeter"
+extract_jmeter_metrics results/laravel_jmeter-resumen.log $SUMMARY_FILE "Laravel + JMeter"
 echo "Laravel Resource Usage:" >> $SUMMARY_FILE
 analyze_usage results/laravel_usage.csv >> $SUMMARY_FILE
 echo "" >> $SUMMARY_FILE
 
 # extract_ab_metrics results/node_ab.txt $SUMMARY_FILE "Node.js Benchmark"
-# extract_jmeter_metrics results/node_jmeter.csv $SUMMARY_FILE "Node.js + JMeter"
+extract_jmeter_metrics results/node_jmeter-resumen.log $SUMMARY_FILE "Node.js + JMeter"
 echo "Node.js Resource Usage:" >> $SUMMARY_FILE
 analyze_usage results/node_usage.csv >> $SUMMARY_FILE
 echo "" >> $SUMMARY_FILE
