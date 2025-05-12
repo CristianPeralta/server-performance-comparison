@@ -119,36 +119,50 @@ extract_jmeter_metrics() {
 # Import utility functions
 source utils.sh
 
+# === Argument parsing ===
+MODE="${1:-jmeter}"
+MODE=$(echo "$MODE" | tr '[:upper:]' '[:lower:]')
+echo "[INFO] Benchmark mode: $MODE"
+
 # Run Laravel benchmark
 echo "Starting Laravel benchmark..."
 monitor_container laravel-app results/laravel_usage.csv &
 PID_LARAVEL=$!
-# TODO: Run ab or jmeter according to the script argument
-# run_benchmark $LARAVEL_URL results/laravel_ab.txt
-run_jmeter $LARAVEL_URL results/laravel_jmeter.csv
+if [[ "$MODE" == "ab" ]]; then
+  run_benchmark $LARAVEL_URL results/laravel_ab.txt
+else
+  run_jmeter $LARAVEL_URL results/laravel_jmeter.csv
+fi
 wait $PID_LARAVEL
 
 # Run Node.js benchmark
 echo "Starting Node.js benchmark..."
 monitor_container nodejs-app results/node_usage.csv &
 PID_NODE=$!
-# run_benchmark $NODE_URL results/node_ab.csv
-run_jmeter $NODE_URL results/node_jmeter.csv
+if [[ "$MODE" == "ab" ]]; then
+  run_benchmark $NODE_URL results/node_ab.txt
+else
+  run_jmeter $NODE_URL results/node_jmeter.csv
+fi
 wait $PID_NODE
 
 # Generate summary
 echo "Generating summary..."
 SUMMARY_FILE="results/summary.txt"
 : > $SUMMARY_FILE
-
-# extract_ab_metrics results/laravel_ab.txt $SUMMARY_FILE "Laravel + Apache Benchmark"
-extract_jmeter_metrics results/laravel_jmeter-resumen.log $SUMMARY_FILE "Laravel + JMeter"
+if [[ "$MODE" == "ab" ]]; then
+  extract_ab_metrics results/laravel_ab.txt $SUMMARY_FILE "Laravel + Apache Benchmark"
+else
+  extract_jmeter_metrics results/laravel_jmeter-resumen.log $SUMMARY_FILE "Laravel + JMeter"
+fi
 echo "Laravel Resource Usage:" >> $SUMMARY_FILE
 analyze_usage results/laravel_usage.csv >> $SUMMARY_FILE
 echo "" >> $SUMMARY_FILE
-
-# extract_ab_metrics results/node_ab.txt $SUMMARY_FILE "Node.js Benchmark"
-extract_jmeter_metrics results/node_jmeter-resumen.log $SUMMARY_FILE "Node.js + JMeter"
+if [[ "$MODE" == "ab" ]]; then
+  extract_ab_metrics results/node_ab.txt $SUMMARY_FILE "Node.js Benchmark"
+else
+  extract_jmeter_metrics results/node_jmeter-resumen.log $SUMMARY_FILE "Node.js + JMeter"
+fi
 echo "Node.js Resource Usage:" >> $SUMMARY_FILE
 analyze_usage results/node_usage.csv >> $SUMMARY_FILE
 echo "" >> $SUMMARY_FILE
