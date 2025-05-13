@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# Configuration
-REQUESTS=643
-CONCURRENCY=1
-DURATION=60
-JSON_PAYLOAD="test_data_message.json"
-CONTENT_TYPE="application/json"
-
 LARAVEL_URL="http://localhost:8000/api/messages"
 NODE_URL="http://localhost:3000/api/messages"
 
