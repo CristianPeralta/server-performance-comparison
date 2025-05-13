@@ -69,10 +69,15 @@ monitor_container() {
   local outfile=$2
   echo "cpu,memory" > $outfile
 
-  for i in $(seq 1 $DURATION); do
-    # Get stats for each container and append to file
+  local start_time=$(date +%s)
+  echo "Monitoring container $container_name for $DURATION seconds..."
+  local end_time=$((start_time + DURATION + 5))
+  local now=$start_time
+
+  while [ $now -lt $end_time ]; do
     docker stats --no-stream --format "{{.CPUPerc}},{{.MemPerc}}" $container_name >> $outfile
     sleep 1
+    now=$(date +%s)
   done
 
   # TODO: Fix this because its taking more time than 60 seconds
