@@ -16,25 +16,27 @@ echo "[INFO] Benchmark mode: $MODE"
 
 # Run Laravel benchmark
 echo "Starting Laravel benchmark..."
-monitor_container laravel-app results/laravel_usage.csv &
-PID_LARAVEL=$!
 if [[ "$MODE" == "ab" ]]; then
-  run_benchmark $LARAVEL_URL results/laravel_ab.txt
+  run_benchmark $LARAVEL_URL results/laravel_ab.txt &
+  BENCH_PID=$!
 else
-  run_jmeter $LARAVEL_URL results/laravel_jmeter.csv
+  run_jmeter $LARAVEL_URL results/laravel_jmeter.csv &
+  BENCH_PID=$!
 fi
-wait $PID_LARAVEL
+monitor_container_until_pid_exit laravel-app results/laravel_usage.csv $BENCH_PID
+wait $BENCH_PID
 
 # Run Node.js benchmark
 echo "Starting Node.js benchmark..."
-monitor_container nodejs-app results/node_usage.csv &
-PID_NODE=$!
 if [[ "$MODE" == "ab" ]]; then
-  run_benchmark $NODE_URL results/node_ab.txt
+  run_benchmark $NODE_URL results/node_ab.txt &
+  BENCH_PID=$!
 else
-  run_jmeter $NODE_URL results/node_jmeter.csv
+  run_jmeter $NODE_URL results/node_jmeter.csv &
+  BENCH_PID=$!
 fi
-wait $PID_NODE
+monitor_container_until_pid_exit nodejs-app results/node_usage.csv $BENCH_PID
+wait $BENCH_PID
 
 # Generate summary
 echo "Generating summary..."
