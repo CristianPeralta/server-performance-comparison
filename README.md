@@ -44,25 +44,42 @@ This project compares the performance of two different server stacks:
 
 ## Running Benchmarks
 
-The benchmark directory contains scripts to test both servers under various conditions:
+The `benchmark` directory contains scripts to evaluate both servers under different conditions:
 - Load testing
 - Response time measurements
-- Resource usage monitoring
+- Resource usage monitoring (CPU and memory via Docker)
 - Database performance comparison
 
-Run the benchmarks using:
+The main script is `benchmark_script.sh`, which supports two benchmark modes:
+- `ab` (Apache Benchmark)
+- `jmeter` (default)
+
+### Usage Example
+
+From the `benchmark` folder:
 ```bash
 cd benchmark
-./run_benchmarks.sh
+# Uses JMeter by default
+./benchmark_script.sh
+# To use Apache Benchmark (ab)
+./benchmark_script.sh ab
 ```
 
-## Results
+The script runs benchmarks for both Laravel and Node.js, monitoring the resource usage of the associated Docker containers (`laravel-app`, `nodejs-app`).
 
-Benchmark results will be stored in the `benchmark/results` directory, including:
-- Response time graphs
-- Resource usage charts
-- Database performance metrics
-- Load test results
+### Available Utilities
+- `utils.sh`: contains functions to analyze resource usage (`analyze_usage`), run benchmarks (`run_benchmark`, `run_jmeter`), and extract metrics from the results.
+- Test payloads are located in `benchmark/data/`.
+- Results are stored in `benchmark/results/`.
+
+### Results
+
+The benchmark results are stored in the `benchmark/results` directory, including:
+- Metrics summaries (`summary.txt`)
+- ab/jmeter output files
+- Resource usage CSV files
+
+You can review the overall summary in `benchmark/results/summary.txt` after each run.
 
 ## Contributing
 
