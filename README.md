@@ -81,6 +81,36 @@ The benchmark results are stored in the `benchmark/results` directory, including
 
 You can review the overall summary in `benchmark/results/summary.txt` after each run.
 
+---
+
+## 📊 Interactive Visualization Simulation
+
+Want to visually compare the performance of Apache and Node.js? You can view an animated and comparative simulation directly in your browser!
+
+### How to launch the visual simulation
+
+1. Open a terminal and navigate to the visualization folder:
+   ```bash
+   cd simulation-visual
+   ```
+2. Run the script to start a local web server:
+   ```bash
+   bash run_visual.sh
+   ```
+   (Requires Python 3 to be installed)
+
+3. Open your web browser and go to:
+   ```
+   http://localhost:8080
+   ```
+
+You will be able to interact with the visual simulation, switch between Apache, Node.js, or compare both, and see real-time charts and animations.
+
+**Notes:**
+- If you are on Windows and do not have bash, you can run: `python -m http.server 8080` and then open the indicated URL.
+- Do not open the HTML file directly; always use the web server.
+- No dependencies or build tools are required.
+
 ## Contributing
 
 Feel free to submit issues and enhancement requests.
