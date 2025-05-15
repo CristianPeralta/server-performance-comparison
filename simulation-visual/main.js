@@ -1,0 +1,287 @@
+// main.js
+const { useState, useRef, useEffect } = React;
+
+// --- Datos simulados (puedes ajustar estos valores) ---
+const SIMULATION_TIME = 60; // segundos
+const TOTAL_REQUESTS = 643;
+const APACHE_METRICS = {
+  avgResponse: 350, // ms
+  throughput: 200, // KB/s
+  errors: 7,
+};
+const NODE_METRICS = {
+  avgResponse: 180, // ms
+  throughput: 350, // KB/s
+  errors: 1,
+};
+
+// Genera datos de curva de carga (línea) para ambos servidores
+function generateLoadCurve() {
+  const time = Array.from({ length: SIMULATION_TIME + 1 }, (_, i) => i);
+  // Simula solicitudes acumuladas con pequeñas variaciones
+  const apache = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.97 + Math.random()*0.06)));
+  const node = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.98 + Math.random()*0.04)));
+  return { time, apache, node };
+}
+
+// --- Componentes ---
+function Tabs({ tab, setTab }) {
+  return (
+    <div className="tabs">
+      <button className={`tab${tab==='apache' ? ' active' : ''}`} onClick={()=>setTab('apache')}>Apache</button>
+      <button className={`tab${tab==='node' ? ' active' : ''}`} onClick={()=>setTab('node')}>Node.js</button>
+      <button className={`tab compare${tab==='compare' ? ' active' : ''}`} onClick={()=>setTab('compare')}>Comparar</button>
+    </div>
+  );
+}
+
+function PlayStop({ running, onPlay, onStop }) {
+  return (
+    <div className="button-group">
+      <button className="play" onClick={onPlay} disabled={running}>Play</button>
+      <button className="stop" onClick={onStop} disabled={!running}>Stop</button>
+    </div>
+  );
+}
+
+function LineChart({ data, showApache, showNode }) {
+  const canvasRef = useRef();
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const chart = new Chart(canvasRef.current, {
+      type: 'line',
+      data: {
+        labels: data.time,
+        datasets: [
+          showApache && {
+            label: 'Apache',
+            data: data.apache,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37,99,235,0.08)',
+            tension: 0.22,
+            pointRadius: 0,
+            borderWidth: 2.5,
+          },
+          showNode && {
+            label: 'Node.js',
+            data: data.node,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16,185,129,0.08)',
+            tension: 0.22,
+            pointRadius: 0,
+            borderWidth: 2.5,
+          },
+        ].filter(Boolean),
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: true },
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Tiempo (segundos)' },
+            ticks: { color: '#64748b' },
+          },
+          y: {
+            title: { display: true, text: 'Solicitudes enviadas' },
+            beginAtZero: true,
+            ticks: { color: '#64748b' },
+          },
+        },
+      },
+    });
+    return () => chart.destroy();
+  }, [data, showApache, showNode]);
+  return <canvas ref={canvasRef} height="110"></canvas>;
+}
+
+function MetricsBar({ apache, node, showApache, showNode }) {
+  // Normalización para altura de barras
+  const maxResp = Math.max(apache.avgResponse, node.avgResponse);
+  const maxThrough = Math.max(apache.throughput, node.throughput);
+  const maxErr = Math.max(apache.errors, node.errors);
+  return (
+    <div className="metrics-bar">
+      <div className="metric">
+        <div className="metric-title">⏱️ Tiempo resp. promedio (ms)</div>
+        <div className="metric-bar">
+          {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: 55 * apache.avgResponse/maxResp + 15}} title={apache.avgResponse}></div>}
+          {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: 55 * node.avgResponse/maxResp + 15}} title={node.avgResponse}></div>}
+        </div>
+        <div className="metric-label">
+          {showApache && <span style={{color:'#2563eb'}}>Apache: {apache.avgResponse} ms</span>}
+          {showApache && showNode && <span> | </span>}
+          {showNode && <span style={{color:'#10b981'}}>Node: {node.avgResponse} ms</span>}
+        </div>
+      </div>
+      <div className="metric">
+        <div className="metric-title">📦 Tasa transferencia (KB/s)</div>
+        <div className="metric-bar">
+          {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: 55 * apache.throughput/maxThrough + 15}} title={apache.throughput}></div>}
+          {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: 55 * node.throughput/maxThrough + 15}} title={node.throughput}></div>}
+        </div>
+        <div className="metric-label">
+          {showApache && <span style={{color:'#2563eb'}}>Apache: {apache.throughput} KB/s</span>}
+          {showApache && showNode && <span> | </span>}
+          {showNode && <span style={{color:'#10b981'}}>Node: {node.throughput} KB/s</span>}
+        </div>
+      </div>
+      <div className="metric">
+        <div className="metric-title">❌ Solicitudes fallidas</div>
+        <div className="metric-bar">
+          {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: 55 * apache.errors/maxErr + 15}} title={apache.errors}></div>}
+          {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: 55 * node.errors/maxErr + 15}} title={node.errors}></div>}
+        </div>
+        <div className="metric-label">
+          {showApache && <span style={{color:'#2563eb'}}>Apache: {apache.errors}</span>}
+          {showApache && showNode && <span> | </span>}
+          {showNode && <span style={{color:'#10b981'}}>Node: {node.errors}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Animación de solicitudes
+function SimulationAnim({ running, tab, progress, requests, errors, server }) {
+  // requests: array de {time, status: 'ok'|'fail'}
+  // progress: 0..1
+  // server: 'apache' | 'node'
+  // Colores
+  const color = server === 'apache' ? '#2563eb' : '#10b981';
+  const icon = server === 'apache' ? '🧭' : '🚀';
+  const serverLabel = server === 'apache' ? 'Apache' : 'Node.js';
+  // Solo muestra los mensajes que ya "llegaron" según el progreso
+  const shown = requests.filter(r => r.time <= progress * SIMULATION_TIME);
+  return (
+    <div className="simulation-anim">
+      <svg className="simulation-svg" viewBox="0 0 440 160">
+        {/* Cliente */}
+        <g>
+          <circle cx="50" cy="80" r="28" fill="#f1f5f9" stroke="#64748b" strokeWidth="2" />
+          <text x="50" y="85" textAnchor="middle" fontSize="28">👤</text>
+        </g>
+        {/* Servidor */}
+        <g>
+          <rect x="340" y="50" width="70" height="60" rx="12" fill={color} />
+          <text x="375" y="88" textAnchor="middle" fontSize="28" fill="#fff">{icon}</text>
+        </g>
+        {/* Mensajes */}
+        {shown.map((r,i) => {
+          const frac = Math.min(1, (progress * SIMULATION_TIME - r.time) / 1.2); // animación de viaje
+          const x = 50 + (290 * frac);
+          const y = 80 + (Math.sin(i*0.7)*15);
+          return (
+            <g key={i}>
+              {/* Mensaje */}
+              <circle cx={x} cy={y} r="10" fill={r.status==='ok'?color:'#ef4444'} opacity={0.93} />
+              <text x={x} y={y+5} textAnchor="middle" fontSize="16" fill="#fff">💬</text>
+              {/* Respuesta */}
+              {frac===1 && (
+                <text x={x+30} y={y+5} fontSize="18" fill={r.status==='ok'?"#10b981":"#ef4444"}>
+                  {r.status==='ok'?'✅':'❌'}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      <div className="timeline-bar">
+        <div className={`timeline-progress${server==='node'?' node':''}`} style={{width: `${progress*100}%`}}></div>
+      </div>
+      <div className="sim-labels">
+        <span>0s</span>
+        <span>{serverLabel}</span>
+        <span>60s</span>
+      </div>
+    </div>
+  );
+}
+
+// Genera solicitudes simuladas
+function generateRequests(server) {
+  // Distribuye TOTAL_REQUESTS en 60s, con errores según métricas
+  const errCount = server==='apache'?APACHE_METRICS.errors:NODE_METRICS.errors;
+  const okCount = TOTAL_REQUESTS - errCount;
+  const reqs = [];
+  // Tiempos aleatorios uniformes
+  let times = Array.from({length: TOTAL_REQUESTS}, () => Math.random()*SIMULATION_TIME);
+  times.sort((a,b)=>a-b);
+  // Marca errores
+  let statusArr = Array(okCount).fill('ok').concat(Array(errCount).fill('fail'));
+  // Mezcla errores aleatoriamente
+  for (let i = statusArr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [statusArr[i], statusArr[j]] = [statusArr[j], statusArr[i]];
+  }
+  for (let i=0; i<TOTAL_REQUESTS; i++) {
+    reqs.push({ time: times[i], status: statusArr[i] });
+  }
+  return reqs;
+}
+
+function SimulationPanel({ tab, running, progress }) {
+  // Prepara los datos
+  const loadData = generateLoadCurve();
+  const apacheReqs = React.useMemo(()=>generateRequests('apache'),[]);
+  const nodeReqs = React.useMemo(()=>generateRequests('node'),[]);
+  const showApache = tab==='apache'||tab==='compare';
+  const showNode = tab==='node'||tab==='compare';
+  return (
+    <div>
+      <LineChart data={loadData} showApache={showApache} showNode={showNode} />
+      <MetricsBar apache={APACHE_METRICS} node={NODE_METRICS} showApache={showApache} showNode={showNode} />
+      {tab==='compare' ? (
+        <div className="split-view">
+          <SimulationAnim running={running} tab={tab} progress={progress} requests={apacheReqs} errors={APACHE_METRICS.errors} server="apache" />
+          <SimulationAnim running={running} tab={tab} progress={progress} requests={nodeReqs} errors={NODE_METRICS.errors} server="node" />
+        </div>
+      ) : tab==='apache' ? (
+        <SimulationAnim running={running} tab={tab} progress={progress} requests={apacheReqs} errors={APACHE_METRICS.errors} server="apache" />
+      ) : (
+        <SimulationAnim running={running} tab={tab} progress={progress} requests={nodeReqs} errors={NODE_METRICS.errors} server="node" />
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [tab, setTab] = useState('compare');
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const timerRef = useRef();
+
+  // Controla la simulación
+  useEffect(() => {
+    if (!running) {
+      setProgress(0);
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+    const start = Date.now();
+    timerRef.current = setInterval(() => {
+      const elapsed = (Date.now() - start) / 1000;
+      setProgress(Math.min(1, elapsed / SIMULATION_TIME));
+      if (elapsed >= SIMULATION_TIME) {
+        setRunning(false);
+        clearInterval(timerRef.current);
+      }
+    }, 60);
+    return () => clearInterval(timerRef.current);
+  }, [running]);
+
+  return (
+    <div className="simulation-container">
+      <h2 style={{textAlign:'center',marginTop:0}}>Simulación Visual: Rendimiento Apache vs Node.js</h2>
+      <Tabs tab={tab} setTab={setTab} />
+      <PlayStop running={running} onPlay={()=>setRunning(true)} onStop={()=>setRunning(false)} />
+      <SimulationPanel tab={tab} running={running} progress={progress} />
+      <div style={{marginTop:'2rem',fontSize:'0.98rem',textAlign:'center',color:'#64748b'}}>
+        <span>Comparando 643 solicitudes POST simuladas en 60 segundos (chat traffic)</span>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);

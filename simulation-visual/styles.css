@@ -1,0 +1,168 @@
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #f8fafc;
+  margin: 0;
+  padding: 0;
+}
+#root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.simulation-container {
+  background: #fff;
+  padding: 2rem 2.5rem;
+  border-radius: 22px;
+  box-shadow: 0 6px 32px rgba(0,0,0,0.09);
+  max-width: 1100px;
+  width: 100%;
+}
+.tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.tab {
+  padding: 0.5rem 1.5rem;
+  border-radius: 8px 8px 0 0;
+  background: #e5e7eb;
+  cursor: pointer;
+  font-weight: 500;
+  color: #334155;
+  border: none;
+  outline: none;
+  transition: background 0.2s;
+}
+.tab.active {
+  background: #2563eb;
+  color: #fff;
+}
+.tab.compare {
+  background: #10b981;
+  color: #fff;
+}
+.split-view {
+  display: flex;
+  gap: 2rem;
+}
+.split-view > div {
+  flex: 1;
+}
+.button-group {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+button.play {
+  background: #10b981;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1.2rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+button.stop {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1.2rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.metrics-bar {
+  display: flex;
+  gap: 1.5rem;
+  margin: 2rem 0 2.5rem;
+  justify-content: center;
+}
+.metric {
+  background: #f1f5f9;
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  text-align: center;
+  min-width: 120px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.metric-title {
+  font-size: 1rem;
+  color: #64748b;
+  margin-bottom: 0.3rem;
+}
+.metric-bar {
+  height: 70px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.7rem;
+}
+.metric-bar-rect {
+  width: 32px;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.7s cubic-bezier(.4,2,.6,1);
+}
+.metric-bar-apache {
+  background: #2563eb;
+}
+.metric-bar-node {
+  background: #10b981;
+}
+.metric-label {
+  font-size: 0.95rem;
+  margin-top: 0.4rem;
+  color: #334155;
+}
+.simulation-anim {
+  margin: 2rem 0 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.simulation-svg {
+  width: 440px;
+  height: 160px;
+  margin-bottom: 0.8rem;
+}
+.timeline-bar {
+  width: 420px;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 5px;
+  margin: 0.7rem 0 0.2rem 0;
+  position: relative;
+}
+.timeline-progress {
+  height: 100%;
+  border-radius: 5px;
+  background: #2563eb;
+  transition: width 0.4s;
+}
+.timeline-progress.node {
+  background: #10b981;
+}
+.sim-labels {
+  display: flex;
+  justify-content: space-between;
+  width: 420px;
+  font-size: 0.93rem;
+  color: #64748b;
+  margin-top: 0.1rem;
+}
+@media (max-width: 900px) {
+  .simulation-container {
+    padding: 1rem 0.5rem;
+    max-width: 100vw;
+  }
+  .simulation-svg, .timeline-bar, .sim-labels {
+    width: 98vw;
+    min-width: 0;
+  }
+  .split-view {
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+}
