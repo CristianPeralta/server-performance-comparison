@@ -80,8 +80,6 @@ monitor_container() {
     sleep 1
     now=$(date +%s)
   done
-
-  # TODO: Fix this because its taking more time than 60 seconds
 }
 
 # Function to monitor container resource usage while a PID is alive
