@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# Configuration
-REQUESTS=643
-CONCURRENCY=1
-DURATION=60
-JSON_PAYLOAD="data/test_data_message.json"
-CONTENT_TYPE="application/json"
-
 # Función para analizar uso de recursos desde docker stats
 analyze_usage() {
   local infile=$1
