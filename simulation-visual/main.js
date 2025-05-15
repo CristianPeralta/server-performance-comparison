@@ -1,8 +1,8 @@
 // main.js
 const { useState, useRef, useEffect } = React;
 
-// --- Datos simulados (puedes ajustar estos valores) ---
-const SIMULATION_TIME = 60; // segundos
+// --- Simulated data (you can adjust these values) ---
+const SIMULATION_TIME = 60; // seconds
 const TOTAL_REQUESTS = 643;
 const APACHE_METRICS = {
   avgResponse: 350, // ms
@@ -15,16 +15,16 @@ const NODE_METRICS = {
   errors: 1,
 };
 
-// Genera datos de curva de carga (línea) para ambos servidores
+// --- Generate load curve data for both servers ---
 function generateLoadCurve() {
   const time = Array.from({ length: SIMULATION_TIME + 1 }, (_, i) => i);
-  // Simula solicitudes acumuladas con pequeñas variaciones
+  // Simulate accumulated requests with small variations
   const apache = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.97 + Math.random()*0.06)));
   const node = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.98 + Math.random()*0.04)));
   return { time, apache, node };
 }
 
-// --- Componentes ---
+// --- Components ---
 function Tabs({ tab, setTab }) {
   return (
     <div className="tabs">
@@ -80,11 +80,11 @@ function LineChart({ data, showApache, showNode }) {
         },
         scales: {
           x: {
-            title: { display: true, text: 'Tiempo (segundos)' },
+            title: { display: true, text: 'Time (seconds)' },
             ticks: { color: '#64748b' },
           },
           y: {
-            title: { display: true, text: 'Solicitudes enviadas' },
+            title: { display: true, text: 'Requests sent' },
             beginAtZero: true,
             ticks: { color: '#64748b' },
           },
@@ -104,7 +104,7 @@ function MetricsBar({ apache, node, showApache, showNode }) {
   return (
     <div className="metrics-bar">
       <div className="metric">
-        <div className="metric-title">⏱️ Tiempo resp. promedio (ms)</div>
+        <div className="metric-title">⏱️ Average response time (ms)</div>
         <div className="metric-bar">
           {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: 55 * apache.avgResponse/maxResp + 15}} title={apache.avgResponse}></div>}
           {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: 55 * node.avgResponse/maxResp + 15}} title={node.avgResponse}></div>}
@@ -116,7 +116,7 @@ function MetricsBar({ apache, node, showApache, showNode }) {
         </div>
       </div>
       <div className="metric">
-        <div className="metric-title">📦 Tasa transferencia (KB/s)</div>
+        <div className="metric-title">📦 Transfer rate (KB/s)</div>
         <div className="metric-bar">
           {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: 55 * apache.throughput/maxThrough + 15}} title={apache.throughput}></div>}
           {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: 55 * node.throughput/maxThrough + 15}} title={node.throughput}></div>}
@@ -128,7 +128,7 @@ function MetricsBar({ apache, node, showApache, showNode }) {
         </div>
       </div>
       <div className="metric">
-        <div className="metric-title">❌ Solicitudes fallidas</div>
+        <div className="metric-title">❌ Failed requests</div>
         <div className="metric-bar">
           {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: 55 * apache.errors/maxErr + 15}} title={apache.errors}></div>}
           {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: 55 * node.errors/maxErr + 15}} title={node.errors}></div>}
@@ -143,12 +143,12 @@ function MetricsBar({ apache, node, showApache, showNode }) {
   );
 }
 
-// Animación de solicitudes
+// Animation of requests
 function SimulationAnim({ running, tab, progress, requests, errors, server }) {
-  // requests: array de {time, status: 'ok'|'fail'}
+  // requests: array of {time, status: 'ok'|'fail'}
   // progress: 0..1
   // server: 'apache' | 'node'
-  // Colores
+  // Colors
   const color = server === 'apache' ? '#2563eb' : '#10b981';
   const icon = server === 'apache' ? '🧭' : '🚀';
   const serverLabel = server === 'apache' ? 'Apache' : 'Node.js';
@@ -199,18 +199,18 @@ function SimulationAnim({ running, tab, progress, requests, errors, server }) {
   );
 }
 
-// Genera solicitudes simuladas
+// Generate simulated requests
 function generateRequests(server) {
-  // Distribuye TOTAL_REQUESTS en 60s, con errores según métricas
+  // Distribute TOTAL_REQUESTS in 60s, with errors according to metrics
   const errCount = server==='apache'?APACHE_METRICS.errors:NODE_METRICS.errors;
   const okCount = TOTAL_REQUESTS - errCount;
   const reqs = [];
-  // Tiempos aleatorios uniformes
+  // Random times
   let times = Array.from({length: TOTAL_REQUESTS}, () => Math.random()*SIMULATION_TIME);
   times.sort((a,b)=>a-b);
-  // Marca errores
+  // Mark errors
   let statusArr = Array(okCount).fill('ok').concat(Array(errCount).fill('fail'));
-  // Mezcla errores aleatoriamente
+  // Randomly mix errors
   for (let i = statusArr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [statusArr[i], statusArr[j]] = [statusArr[j], statusArr[i]];
@@ -222,7 +222,7 @@ function generateRequests(server) {
 }
 
 function SimulationPanel({ tab, running, progress }) {
-  // Prepara los datos
+  // Prepare data
   const loadData = generateLoadCurve();
   const apacheReqs = React.useMemo(()=>generateRequests('apache'),[]);
   const nodeReqs = React.useMemo(()=>generateRequests('node'),[]);
@@ -252,7 +252,7 @@ function App() {
   const [progress, setProgress] = useState(0);
   const timerRef = useRef();
 
-  // Controla la simulación
+  // Control the simulation
   useEffect(() => {
     if (!running) {
       setProgress(0);
@@ -273,12 +273,12 @@ function App() {
 
   return (
     <div className="simulation-container">
-      <h2 style={{textAlign:'center',marginTop:0}}>Simulación Visual: Rendimiento Apache vs Node.js</h2>
+      <h2 style={{textAlign:'center',marginTop:0}}>Simulation Visual: Apache vs Node.js</h2>
       <Tabs tab={tab} setTab={setTab} />
       <PlayStop running={running} onPlay={()=>setRunning(true)} onStop={()=>setRunning(false)} />
       <SimulationPanel tab={tab} running={running} progress={progress} />
       <div style={{marginTop:'2rem',fontSize:'0.98rem',textAlign:'center',color:'#64748b'}}>
-        <span>Comparando 643 solicitudes POST simuladas en 60 segundos (chat traffic)</span>
+        <span>Comparing 643 POST requests simulated in 60 seconds (chat traffic)</span>
       </div>
     </div>
   );
