@@ -4,16 +4,57 @@ const { useState, useRef, useEffect } = React;
 // --- Simulated data (you can adjust these values) ---
 const SIMULATION_TIME = 60; // seconds
 const TOTAL_REQUESTS = 643;
-const APACHE_METRICS = {
+
+// Default metrics in case file is not found
+const DEFAULT_APACHE_METRICS = {
   avgResponse: 350, // ms
   throughput: 200, // KB/s
   errors: 7,
 };
-const NODE_METRICS = {
+const DEFAULT_NODE_METRICS = {
   avgResponse: 180, // ms
   throughput: 350, // KB/s
   errors: 1,
 };
+
+// Hook to fetch and parse metrics from summary.txt
+function useDynamicMetrics() {
+  const [apache, setApache] = React.useState(DEFAULT_APACHE_METRICS);
+  const [node, setNode] = React.useState(DEFAULT_NODE_METRICS);
+
+  React.useEffect(() => {
+    fetch('./summary.json')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(txt => {
+        console.log('Summary loaded:', txt);
+        // Parse metrics for Laravel/Apache
+        const laravelSection = txt.laravel;
+        const nodeSection = txt.node;
+        const parseSection = (section) => {
+          const avgResponse = section.avgResponse;
+          const errors = section.errors;
+          const complete = section.complete;
+          const rps = section.rps;
+          // Throughput is not present, fallback to rps * 20 as a guess
+          return {
+            avgResponse,
+            errors,
+            throughput: Math.round(rps * 20),
+            complete,
+            rps,
+          };
+        };
+        if (laravelSection) setApache(parseSection(laravelSection));
+        if (nodeSection) setNode(parseSection(nodeSection));
+      })
+      .catch(() => {
+        setApache(DEFAULT_APACHE_METRICS);
+        setNode(DEFAULT_NODE_METRICS);
+      });
+  }, []);
+
+  return { apache, node };
+}
 
 // --- Generate load curve data for both servers ---
 function generateLoadCurve() {
@@ -101,13 +142,21 @@ function MetricsBar({ apache, node, showApache, showNode }) {
   const maxResp = Math.max(apache.avgResponse, node.avgResponse);
   const maxThrough = Math.max(apache.throughput, node.throughput);
   const maxErr = Math.max(apache.errors, node.errors);
+  console.log("maxErr", maxErr, "maxResp", maxResp, "maxThrough", maxThrough);
+
+  const highErr = (server) =>  55 * (maxErr > 0 ? (server.errors/maxErr) : 0) + 5;
+  const highResp = (server) => 55 * (maxResp > 0 ? (server.avgResponse/maxResp) : 0) + 5;
+  const highThrough = (server) => 55 * (maxThrough > 0 ? (server.throughput/maxThrough) : 0) + 5;
+
+  console.log("highErr apache", highErr(apache), "highResp apache", highResp(apache), "highThrough apache", highThrough(apache));
+  console.log("highErr node", highErr(node), "highResp node", highResp(node), "highThrough node", highThrough(node));
   return (
     <div className="metrics-bar">
       <div className="metric">
         <div className="metric-title">⏱️ Average response time (ms)</div>
         <div className="metric-bar">
-          {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: 55 * apache.avgResponse/maxResp + 15}} title={apache.avgResponse}></div>}
-          {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: 55 * node.avgResponse/maxResp + 15}} title={node.avgResponse}></div>}
+          {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: highResp(apache)}} title={apache.avgResponse}></div>}
+          {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: highResp(node)}} title={node.avgResponse}></div>}
         </div>
         <div className="metric-label">
           {showApache && <span style={{color:'#2563eb'}}>Apache: {apache.avgResponse} ms</span>}
@@ -118,8 +167,8 @@ function MetricsBar({ apache, node, showApache, showNode }) {
       <div className="metric">
         <div className="metric-title">📦 Transfer rate (KB/s)</div>
         <div className="metric-bar">
-          {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: 55 * apache.throughput/maxThrough + 15}} title={apache.throughput}></div>}
-          {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: 55 * node.throughput/maxThrough + 15}} title={node.throughput}></div>}
+          {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: highThrough(apache)}} title={apache.throughput}></div>}
+          {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: highThrough(node)}} title={node.throughput}></div>}
         </div>
         <div className="metric-label">
           {showApache && <span style={{color:'#2563eb'}}>Apache: {apache.throughput} KB/s</span>}
@@ -130,8 +179,8 @@ function MetricsBar({ apache, node, showApache, showNode }) {
       <div className="metric">
         <div className="metric-title">❌ Failed requests</div>
         <div className="metric-bar">
-          {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: 55 * apache.errors/maxErr + 15}} title={apache.errors}></div>}
-          {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: 55 * node.errors/maxErr + 15}} title={node.errors}></div>}
+          {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: highErr(apache)}} title={apache.errors}></div>}
+          {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: highErr(node)}} title={node.errors}></div>}
         </div>
         <div className="metric-label">
           {showApache && <span style={{color:'#2563eb'}}>Apache: {apache.errors}</span>}
@@ -199,10 +248,35 @@ function SimulationAnim({ running, tab, progress, requests, errors, server }) {
   );
 }
 
-// Generate simulated requests
-function generateRequests(server) {
+function SimulationPanel({ tab, running, progress, apacheMetrics, nodeMetrics }) {
+  // Prepare data
+  const loadData = generateLoadCurve();
+  const apacheReqs = React.useMemo(()=>generateRequests('apache', apacheMetrics.errors),[apacheMetrics.errors]);
+  const nodeReqs = React.useMemo(()=>generateRequests('node', nodeMetrics.errors),[nodeMetrics.errors]);
+  const showApache = tab==='apache'||tab==='compare';
+  const showNode = tab==='node'||tab==='compare';
+  return (
+    <div>
+      <LineChart data={loadData} showApache={showApache} showNode={showNode} />
+      <MetricsBar apache={apacheMetrics} node={nodeMetrics} showApache={showApache} showNode={showNode} />
+      {tab==='compare' ? (
+        <div className="split-view">
+          <SimulationAnim running={running} tab={tab} progress={progress} requests={apacheReqs} errors={apacheMetrics.errors} server="apache" />
+          <SimulationAnim running={running} tab={tab} progress={progress} requests={nodeReqs} errors={nodeMetrics.errors} server="node" />
+        </div>
+      ) : tab==='apache' ? (
+        <SimulationAnim running={running} tab={tab} progress={progress} requests={apacheReqs} errors={apacheMetrics.errors} server="apache" />
+      ) : (
+        <SimulationAnim running={running} tab={tab} progress={progress} requests={nodeReqs} errors={nodeMetrics.errors} server="node" />
+      )}
+    </div>
+  );
+}
+
+// Update generateRequests to accept errors as parameter
+function generateRequests(server, errorsCount) {
   // Distribute TOTAL_REQUESTS in 60s, with errors according to metrics
-  const errCount = server==='apache'?APACHE_METRICS.errors:NODE_METRICS.errors;
+  const errCount = typeof errorsCount === 'number' ? errorsCount : (server==='apache'?DEFAULT_APACHE_METRICS.errors:DEFAULT_NODE_METRICS.errors);
   const okCount = TOTAL_REQUESTS - errCount;
   const reqs = [];
   // Random times
@@ -221,36 +295,12 @@ function generateRequests(server) {
   return reqs;
 }
 
-function SimulationPanel({ tab, running, progress }) {
-  // Prepare data
-  const loadData = generateLoadCurve();
-  const apacheReqs = React.useMemo(()=>generateRequests('apache'),[]);
-  const nodeReqs = React.useMemo(()=>generateRequests('node'),[]);
-  const showApache = tab==='apache'||tab==='compare';
-  const showNode = tab==='node'||tab==='compare';
-  return (
-    <div>
-      <LineChart data={loadData} showApache={showApache} showNode={showNode} />
-      <MetricsBar apache={APACHE_METRICS} node={NODE_METRICS} showApache={showApache} showNode={showNode} />
-      {tab==='compare' ? (
-        <div className="split-view">
-          <SimulationAnim running={running} tab={tab} progress={progress} requests={apacheReqs} errors={APACHE_METRICS.errors} server="apache" />
-          <SimulationAnim running={running} tab={tab} progress={progress} requests={nodeReqs} errors={NODE_METRICS.errors} server="node" />
-        </div>
-      ) : tab==='apache' ? (
-        <SimulationAnim running={running} tab={tab} progress={progress} requests={apacheReqs} errors={APACHE_METRICS.errors} server="apache" />
-      ) : (
-        <SimulationAnim running={running} tab={tab} progress={progress} requests={nodeReqs} errors={NODE_METRICS.errors} server="node" />
-      )}
-    </div>
-  );
-}
-
 function App() {
   const [tab, setTab] = useState('compare');
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const timerRef = useRef();
+  const { apache, node } = useDynamicMetrics();
 
   // Control the simulation
   useEffect(() => {
@@ -276,7 +326,7 @@ function App() {
       <h2 style={{textAlign:'center',marginTop:0}}>Simulation Visual: Apache vs Node.js</h2>
       <Tabs tab={tab} setTab={setTab} />
       <PlayStop running={running} onPlay={()=>setRunning(true)} onStop={()=>setRunning(false)} />
-      <SimulationPanel tab={tab} running={running} progress={progress} />
+      <SimulationPanel tab={tab} running={running} progress={progress} apacheMetrics={apache} nodeMetrics={node} />
       <div style={{marginTop:'2rem',fontSize:'0.98rem',textAlign:'center',color:'#64748b'}}>
         <span>Comparing 643 POST requests simulated in 60 seconds (chat traffic)</span>
       </div>
