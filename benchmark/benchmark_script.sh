@@ -48,6 +48,7 @@ wait $BENCH_PID
 # Generate summary
 echo "Generating summary..."
 SUMMARY_FILE="results/summary.txt"
+SUMMARY_JSON="../simulation-visual/summary.json"
 : > $SUMMARY_FILE
 if [[ "$MODE" == "ab" ]]; then
   extract_ab_metrics results/laravel_ab.txt $SUMMARY_FILE "Laravel + Apache Benchmark"

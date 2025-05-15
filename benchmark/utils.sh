@@ -158,6 +158,17 @@ extract_jmeter_metrics() {
   local title=$3
 
   echo "=== $title ===" >> $outfile
+
+  # Detect if is node or laravel
+  # Example extract_jmeter_metrics results/laravel_jmeter-resumen.log $SUMMARY_FILE "Laravel + JMeter"
+  local server
+  if [[ "$title" == *"ode"* ]]; then
+    server="node"
+  else
+    server="laravel"
+  fi
+  echo "Server: $server"
+  
   echo "" >> $outfile
 
   # Get the final summary line
@@ -190,4 +201,44 @@ extract_jmeter_metrics() {
   echo "Complete requests: ${total_requests}" >> "$outfile"
   echo "Requests per second: ${rps}" >> "$outfile"
   echo "" >> "$outfile"
+
+  # Append metrics as a JSON object (detecting if is node or laravel)
+  # The expected result scheme is this
+  # {
+  #   "laravel": {
+  #     "avgResponse": 83,
+  #     "throughput": 10.7,
+  #     "errors": 0,
+  #     "complete": 643,
+  #     "rps": 10.7
+  #   },
+  #   "node": {
+  #     "avgResponse": 3,
+  #     "throughput": 10.7,
+  #     "errors": 0,
+  #     "complete": 643,
+  #     "rps": 10.7
+  #   }
+  # }
+  
+  # Verify if summary.json exists
+  if test -f "$SUMMARY_JSON"; then  
+    # If it exists, append the metrics to the file, create it with the end } bracket
+    echo -e ",\n  \"$server\": {
+    \"avgResponse\": $avg_time,
+    \"throughput\": $rps,
+    \"errors\": $error_count,
+    \"complete\": $total_requests,
+    \"rps\": $rps
+  }}" >> $SUMMARY_JSON
+  else
+    # If it doesn't exist, create it with the first { bracket
+    echo -e "{\n  \"$server\": {
+    \"avgResponse\": $avg_time,
+    \"throughput\": $rps,
+    \"errors\": $error_count,
+    \"complete\": $total_requests,
+    \"rps\": $rps
+  }" > $SUMMARY_JSON
+  fi
 }
