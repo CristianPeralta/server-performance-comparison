@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Función para analizar uso de recursos desde docker stats
+# Function to analyze resource usage from docker stats
 analyze_usage() {
   local infile=$1
   local cpu_sum=0
