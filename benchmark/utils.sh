@@ -221,6 +221,7 @@ extract_jmeter_metrics() {
   #   }
   # }
   
+  # TODO: Improve this for more servers
   # Verify if summary.json exists
   if test -f "$SUMMARY_JSON"; then  
     # If it exists, append the metrics to the file, create it with the end } bracket
