@@ -65,6 +65,31 @@ function generateLoadCurve() {
   return { time, apache, node };
 }
 
+// --- Get load curve from node and laravel csv ---
+function getLoadCurveFromCsvs() {
+  const time = Array.from({ length: SIMULATION_TIME + 1 }, (_, i) => i);
+  const [apache, setApache] = React.useState([]);
+  const [node, setNode] = React.useState([]);
+  
+  React.useEffect(() => {
+    Promise.all([
+      fetch('laravel_jmeter.csv').then(res => res.text()),
+      fetch('node_jmeter.csv').then(res => res.text()),
+    ]).then(([laravel_csv, node_csv]) => {
+      const laravel_lines = laravel_csv.split('\n').map(line => line.split(',')[14]);
+      const node_lines = node_csv.split('\n').map(line => line.split(',')[14]);
+      const apache = laravel_lines.map(line => parseInt(line));
+      const node = node_lines.map(line => parseInt(line));
+      console.log("apache", apache);
+      console.log("node", node);
+      setApache(apache);
+      setNode(node);
+    });
+  }, []);
+
+  return { time, apache, node };
+}
+
 // --- Components ---
 function Tabs({ tab, setTab }) {
   return (
@@ -125,7 +150,7 @@ function LineChart({ data, showApache, showNode }) {
             ticks: { color: '#64748b' },
           },
           y: {
-            title: { display: true, text: 'Requests sent' },
+            title: { display: true, text: 'Latency (ms)' },
             beginAtZero: true,
             ticks: { color: '#64748b' },
           },
@@ -250,7 +275,8 @@ function SimulationAnim({ running, tab, progress, requests, errors, server }) {
 
 function SimulationPanel({ tab, running, progress, apacheMetrics, nodeMetrics }) {
   // Prepare data
-  const loadData = generateLoadCurve();
+  const loadData = getLoadCurveFromCsvs();
+
   const apacheReqs = React.useMemo(()=>generateRequests('apache', apacheMetrics.errors),[apacheMetrics.errors]);
   const nodeReqs = React.useMemo(()=>generateRequests('node', nodeMetrics.errors),[nodeMetrics.errors]);
   const showApache = tab==='apache'||tab==='compare';
