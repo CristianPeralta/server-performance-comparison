@@ -26,7 +26,6 @@ function useDynamicMetrics() {
     fetch('./summary.json')
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(txt => {
-        console.log('Summary loaded:', txt);
         // Parse metrics for Laravel/Apache
         const laravelSection = txt.laravel;
         const nodeSection = txt.node;
@@ -80,8 +79,6 @@ function getLoadCurveFromCsvs() {
       const node_lines = node_csv.split('\n').map(line => line.split(',')[14]);
       const apache = laravel_lines.map(line => parseInt(line));
       const node = node_lines.map(line => parseInt(line));
-      console.log("apache", apache);
-      console.log("node", node);
       setApache(apache);
       setNode(node);
     });
@@ -167,14 +164,11 @@ function MetricsBar({ apache, node, showApache, showNode }) {
   const maxResp = Math.max(apache.avgResponse, node.avgResponse);
   const maxThrough = Math.max(apache.throughput, node.throughput);
   const maxErr = Math.max(apache.errors, node.errors);
-  console.log("maxErr", maxErr, "maxResp", maxResp, "maxThrough", maxThrough);
 
   const highErr = (server) =>  55 * (maxErr > 0 ? (server.errors/maxErr) : 0) + 5;
   const highResp = (server) => 55 * (maxResp > 0 ? (server.avgResponse/maxResp) : 0) + 5;
   const highThrough = (server) => 55 * (maxThrough > 0 ? (server.throughput/maxThrough) : 0) + 5;
 
-  console.log("highErr apache", highErr(apache), "highResp apache", highResp(apache), "highThrough apache", highThrough(apache));
-  console.log("highErr node", highErr(node), "highResp node", highResp(node), "highThrough node", highThrough(node));
   return (
     <div className="metrics-bar">
       <div className="metric">
@@ -277,8 +271,14 @@ function SimulationPanel({ tab, running, progress, apacheMetrics, nodeMetrics })
   // Prepare data
   const loadData = getLoadCurveFromCsvs();
 
-  const apacheReqs = React.useMemo(()=>generateRequests('apache', apacheMetrics.errors),[apacheMetrics.errors]);
-  const nodeReqs = React.useMemo(()=>generateRequests('node', nodeMetrics.errors),[nodeMetrics.errors]);
+  // State for requests loaded from CSV
+  const [apacheReqs, setApacheReqs] = React.useState([]);
+  const [nodeReqs, setNodeReqs] = React.useState([]);
+
+  React.useEffect(() => {
+    generateRequests('apache').then(setApacheReqs);
+    generateRequests('node').then(setNodeReqs);
+  }, []);
   const showApache = tab==='apache'||tab==='compare';
   const showNode = tab==='node'||tab==='compare';
   return (
@@ -300,25 +300,31 @@ function SimulationPanel({ tab, running, progress, apacheMetrics, nodeMetrics })
 }
 
 // Update generateRequests to accept errors as parameter
-function generateRequests(server, errorsCount) {
-  // Distribute TOTAL_REQUESTS in 60s, with errors according to metrics
-  const errCount = typeof errorsCount === 'number' ? errorsCount : (server==='apache'?DEFAULT_APACHE_METRICS.errors:DEFAULT_NODE_METRICS.errors);
-  const okCount = TOTAL_REQUESTS - errCount;
-  const reqs = [];
-  // Random times
-  let times = Array.from({length: TOTAL_REQUESTS}, () => Math.random()*SIMULATION_TIME);
-  times.sort((a,b)=>a-b);
-  // Mark errors
-  let statusArr = Array(okCount).fill('ok').concat(Array(errCount).fill('fail'));
-  // Randomly mix errors
-  for (let i = statusArr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [statusArr[i], statusArr[j]] = [statusArr[j], statusArr[i]];
+// Refactored: generateRequests now fetches and parses CSV data
+async function generateRequests(server) {
+  // Select CSV file based on server
+  const csvFile = server === 'apache' ? 'laravel_jmeter.csv' : 'node_jmeter.csv';
+  const res = await fetch(csvFile);
+  const text = await res.text();
+  const lines = text.split('\n').filter(Boolean);
+  if (lines.length === 0) return [];
+  // Parse CSV rows: timestamp (col 0), status (col 3)
+  const requests = [];
+  const firstTimestamp = parseInt(lines[1].split(',')[0]);
+  for (let i = 0; i < lines.length; i++) {
+    const cols = lines[i].split(',');
+    if (cols.length < 4) continue;
+    const timestamp = parseInt(cols[0]);
+    const status = cols[3].trim();
+    if (!timestamp || isNaN(timestamp)) continue;
+    // Only consider rows with status
+    const time = timestamp - firstTimestamp;
+    requests.push({
+      time: time / 1000, // assuming timestamp is in ms, convert to seconds
+      status: status === '201' ? 'ok' : 'fail',
+    });
   }
-  for (let i=0; i<TOTAL_REQUESTS; i++) {
-    reqs.push({ time: times[i], status: statusArr[i] });
-  }
-  return reqs;
+  return requests;
 }
 
 function App() {
