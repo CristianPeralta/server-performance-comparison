@@ -121,7 +121,7 @@ run_benchmark() {
   #   -l: accept variable document length (for dynamic pages)
   #   -q: don't show progress when doing more than 150 requests
   # The output is redirected to $outfile
-  ab -n $REQUESTS -c $CONCURRENCY -p $JSON_PAYLOAD -T $CONTENT_TYPE -s 60 -r -k -d -S -v 4 -l -q $url > $outfile
+  ab -n $REQUESTS -c $CONCURRENCY -p $JSON_PAYLOAD -T $CONTENT_TYPE -s 60 -r -k -v 4 -l -q $url > $outfile
 }
 
 # Function to run jmeter with POST
@@ -132,6 +132,77 @@ run_jmeter() {
   local port=$(echo "$url" | sed -nE 's#^[a-z]+://[^:/]+:([0-9]+).*#\1#p')
   echo "Port: $port"
   jmeter -n -t test-plan.jmx -l $outfile -Jport=$port > "${outfile%.csv}-resumen.log"
+}
+
+# Function to extract ab metrics
+
+# Function to extract timestamps and response codes from ab output and write CSV
+# Usage: extract_timestamps_responseCode_csv input.txt output.csv
+extract_timestamps_responseCode_csv() {
+  local infile="$1"
+  local outfile="$2"
+
+  echo "timeStamp,responseCode" > "$outfile"
+  local responseCode=""
+  local dateStr=""
+  local timestamp=""
+  local expect_header=0
+  local expect_date=0
+  local last_json=""
+  local last_response_code_line_num=0
+  local line_num=0
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line_num=$((line_num+1))
+    # Save last JSON line
+    if [[ "$line" =~ ^\{.*\}$ ]]; then
+      last_json="$line"
+    fi
+    # Look for response code
+    if [[ "$line" =~ ^LOG:\ Response\ code\ =\ ([0-9]{3}) ]]; then
+      responseCode="${BASH_REMATCH[1]}"
+      expect_header=1
+      last_response_code_line_num=$line_num
+      continue
+    fi
+    # After response code, wait for LOG: header received:
+    if [[ $expect_header -eq 1 && "$line" == "LOG: header received:"* ]]; then
+      expect_header=0
+      expect_date=1
+      continue
+    fi
+    # After header, look for Date:
+    if [[ $expect_date -eq 1 && "$line" =~ ^Date: ]]; then
+      dateStr=$(echo "$line" | sed -E 's/^Date: //;s/ GMT$//')
+      timestamp=$(date -d "$dateStr" +%s 2>/dev/null)
+      if [[ -n "$timestamp" && -n "$responseCode" ]]; then
+        echo "$timestamp,$responseCode" >> "$outfile"
+      fi
+      expect_date=0
+      responseCode=""
+      dateStr=""
+      timestamp=""
+      continue
+    fi
+  done < "$infile"
+
+  # Handle the last response code if it wasn't paired (end of file)
+  if [[ $expect_header -eq 1 && -n "$responseCode" && -n "$last_json" ]]; then
+    # Try to extract created_at or timestamp from last_json
+    if [[ "$last_json" =~ "created_at":"([0-9TZ\-\.:]+)" ]]; then
+      dateStr="${BASH_REMATCH[1]}"
+    elif [[ "$last_json" =~ "timestamp":"([0-9TZ\-\.:]+)" ]]; then
+      dateStr="${BASH_REMATCH[1]}"
+    else
+      dateStr=""
+    fi
+    # Remove fractional seconds if present
+    dateStr=$(echo "$dateStr" | sed -E 's/\.[0-9]+Z$/Z/')
+    timestamp=$(date -d "$dateStr" +%s 2>/dev/null)
+    if [[ -n "$timestamp" && -n "$responseCode" ]]; then
+      echo "$timestamp,$responseCode" >> "$outfile"
+    fi
+  fi
 }
 
 # Function to extract ab metrics

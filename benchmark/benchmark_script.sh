@@ -52,6 +52,7 @@ SUMMARY_JSON="../simulation-visual/summary.json"
 : > $SUMMARY_FILE
 if [[ "$MODE" == "ab" ]]; then
   extract_ab_metrics results/laravel_ab.txt $SUMMARY_FILE "Laravel + Apache Benchmark"
+  extract_timestamps_responseCode_csv results/laravel_ab.txt results/laravel_ab_simple.csv
 else
   extract_jmeter_metrics results/laravel_jmeter-resumen.log $SUMMARY_FILE "Laravel + JMeter"
 fi
@@ -60,6 +61,7 @@ analyze_usage results/laravel_usage.csv >> $SUMMARY_FILE
 echo "" >> $SUMMARY_FILE
 if [[ "$MODE" == "ab" ]]; then
   extract_ab_metrics results/node_ab.txt $SUMMARY_FILE "Node.js Benchmark"
+  extract_timestamps_responseCode_csv results/node_ab.txt results/node_ab_simple.csv
 else
   extract_jmeter_metrics results/node_jmeter-resumen.log $SUMMARY_FILE "Node.js + JMeter"
 fi
