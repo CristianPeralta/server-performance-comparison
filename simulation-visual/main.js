@@ -23,7 +23,7 @@ function useDynamicMetrics() {
   const [node, setNode] = React.useState(DEFAULT_NODE_METRICS);
 
   React.useEffect(() => {
-    fetch('./summary.json')
+    fetch('./jmeter/summary.json')
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(txt => {
         // Parse metrics for Laravel/Apache
@@ -72,8 +72,8 @@ function getLoadCurveFromCsvs() {
   
   React.useEffect(() => {
     Promise.all([
-      fetch('laravel_jmeter.csv').then(res => res.text()),
-      fetch('node_jmeter.csv').then(res => res.text()),
+      fetch('jmeter/laravel_jmeter.csv').then(res => res.text()),
+      fetch('jmeter/node_jmeter.csv').then(res => res.text()),
     ]).then(([laravel_csv, node_csv]) => {
       const laravel_lines = laravel_csv.split('\n').map(line => line.split(',')[14]);
       const node_lines = node_csv.split('\n').map(line => line.split(',')[14]);
@@ -303,7 +303,7 @@ function SimulationPanel({ tab, running, progress, apacheMetrics, nodeMetrics })
 // Refactored: generateRequests now fetches and parses CSV data
 async function generateRequests(server) {
   // Select CSV file based on server
-  const csvFile = server === 'apache' ? 'laravel_jmeter.csv' : 'node_jmeter.csv';
+  const csvFile = server === 'apache' ? 'jmeter/laravel_jmeter.csv' : 'jmeter/node_jmeter.csv';
   const res = await fetch(csvFile);
   const text = await res.text();
   const lines = text.split('\n').filter(Boolean);
