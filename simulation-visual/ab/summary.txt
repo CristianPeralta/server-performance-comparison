@@ -1,0 +1,26 @@
+=== Laravel + Apache Benchmark ===
+
+Time per request:       56.513 [ms] (mean)
+Failed requests:        0
+Complete requests:      643
+Requests per second:    17.69 [#/sec] (mean)
+
+Laravel Resource Usage:
+Processing results/ab/laravel_usage.csv...
+CPU avg: 76.78% | Memory avg: .49%
+
+=== Node.js Benchmark ===
+
+Time per request:       0.420 [ms] (mean)
+Failed requests:        0
+Complete requests:      643
+Requests per second:    2380.26 [#/sec] (mean)
+
+Node.js Resource Usage:
+Processing results/ab/node_usage.csv...
+CPU avg: 32.19% | Memory avg: .38%
+
+Laravel Resource Usage:
+Processing results/ab/laravel_usage.csv...
+CPU avg: 52.76% | Memory avg: .49%
+
