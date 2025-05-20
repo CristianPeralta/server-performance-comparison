@@ -32,8 +32,13 @@ else
   run_jmeter $LARAVEL_URL results/jmeter/laravel_jmeter.csv &
   BENCH_PID=$!
 fi
+if [[ "$MODE" == "ab" ]]; then
 monitor_container_until_pid_exit laravel-app results/ab/laravel_usage.csv $BENCH_PID
 wait $BENCH_PID
+else
+monitor_container_until_pid_exit laravel-app results/jmeter/laravel_usage.csv $BENCH_PID
+wait $BENCH_PID
+fi
 
 # Run Node.js benchmark
 echo "Starting Node.js benchmark..."
@@ -44,8 +49,13 @@ else
   run_jmeter $NODE_URL results/jmeter/node_jmeter.csv &
   BENCH_PID=$!
 fi
+if [[ "$MODE" == "ab" ]]; then
 monitor_container_until_pid_exit nodejs-app results/ab/node_usage.csv $BENCH_PID
 wait $BENCH_PID
+else
+monitor_container_until_pid_exit nodejs-app results/jmeter/node_usage.csv $BENCH_PID
+wait $BENCH_PID
+fi
 
 # Generate summary
 echo "Generating summary..."
@@ -64,9 +74,15 @@ if [[ "$MODE" == "ab" ]]; then
 else
   extract_jmeter_metrics results/jmeter/laravel_jmeter-resumen.log $SUMMARY_FILE_JMETER "Laravel + JMeter"
 fi
-echo "Laravel Resource Usage:" >> $SUMMARY_FILE_AB
-analyze_usage results/ab/laravel_usage.csv >> $SUMMARY_FILE_AB
-echo "" >> $SUMMARY_FILE_AB
+if [[ "$MODE" == "ab" ]]; then
+  echo "Laravel Resource Usage:" >> $SUMMARY_FILE_AB
+  analyze_usage results/ab/laravel_usage.csv >> $SUMMARY_FILE_AB
+  echo "" >> $SUMMARY_FILE_AB
+else
+  echo "Laravel Resource Usage:" >> $SUMMARY_FILE_JMETER
+  analyze_usage results/jmeter/laravel_usage.csv >> $SUMMARY_FILE_JMETER
+  echo "" >> $SUMMARY_FILE_JMETER
+fi
 if [[ "$MODE" == "ab" ]]; then
   extract_ab_metrics results/ab/node_ab.txt $SUMMARY_FILE_AB "Node.js Benchmark"
   extract_timestamps_responseCode_csv results/ab/node_ab.txt results/ab/node_ab_simple.csv
@@ -74,18 +90,18 @@ else
   extract_jmeter_metrics results/jmeter/node_jmeter-resumen.log $SUMMARY_FILE_JMETER "Node.js + JMeter"
 fi
 if [[ "$MODE" == "ab" ]]; then
-echo "Node.js Resource Usage:" >> $SUMMARY_FILE_AB
-analyze_usage results/ab/node_usage.csv >> $SUMMARY_FILE_AB
-echo "" >> $SUMMARY_FILE_AB
+  echo "Node.js Resource Usage:" >> $SUMMARY_FILE_AB
+  analyze_usage results/ab/node_usage.csv >> $SUMMARY_FILE_AB
+  echo "" >> $SUMMARY_FILE_AB
 else
-echo "Node.js Resource Usage:" >> $SUMMARY_FILE_JMETER
-analyze_usage results/ab/node_usage.csv >> $SUMMARY_FILE_JMETER
-echo "" >> $SUMMARY_FILE_JMETER
+  echo "Node.js Resource Usage:" >> $SUMMARY_FILE_JMETER
+  analyze_usage results/jmeter/node_usage.csv >> $SUMMARY_FILE_JMETER
+  echo "" >> $SUMMARY_FILE_JMETER
 fi
 if [[ "$MODE" == "ab" ]]; then
-cat $SUMMARY_FILE_AB
-echo "Summary saved to $SUMMARY_FILE_AB"
+  cat $SUMMARY_FILE_AB
+  echo "Summary saved to $SUMMARY_FILE_AB"
 else
-cat $SUMMARY_FILE_JMETER
-echo "Summary saved to $SUMMARY_FILE_JMETER"
+  cat $SUMMARY_FILE_JMETER
+  echo "Summary saved to $SUMMARY_FILE_JMETER"
 fi
