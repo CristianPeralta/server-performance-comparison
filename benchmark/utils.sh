@@ -231,7 +231,7 @@ extract_jmeter_metrics() {
   echo "=== $title ===" >> $outfile
 
   # Detect if is node or laravel
-  # Example extract_jmeter_metrics results/laravel_jmeter-resumen.log $SUMMARY_FILE "Laravel + JMeter"
+  # Example extract_jmeter_metrics $SUMMARY_FILE "Laravel + JMeter"
   local server
   if [[ "$title" == *"ode"* ]]; then
     server="node"

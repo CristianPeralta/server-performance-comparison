@@ -5,6 +5,8 @@ NODE_URL="http://localhost:3000/api/messages"
 
 # Create output directories
 mkdir -p results
+mkdir -p results/ab
+mkdir -p results/jmeter
 
 # Import utility functions
 source utils.sh
@@ -24,50 +26,65 @@ CONTENT_TYPE="application/json"
 # Run Laravel benchmark
 echo "Starting Laravel benchmark..."
 if [[ "$MODE" == "ab" ]]; then
-  run_benchmark $LARAVEL_URL results/laravel_ab.txt &
+  run_benchmark $LARAVEL_URL results/ab/laravel_ab.txt &
   BENCH_PID=$!
 else
-  run_jmeter $LARAVEL_URL results/laravel_jmeter.csv &
+  run_jmeter $LARAVEL_URL results/jmeter/laravel_jmeter.csv &
   BENCH_PID=$!
 fi
-monitor_container_until_pid_exit laravel-app results/laravel_usage.csv $BENCH_PID
+monitor_container_until_pid_exit laravel-app results/ab/laravel_usage.csv $BENCH_PID
 wait $BENCH_PID
 
 # Run Node.js benchmark
 echo "Starting Node.js benchmark..."
 if [[ "$MODE" == "ab" ]]; then
-  run_benchmark $NODE_URL results/node_ab.txt &
+  run_benchmark $NODE_URL results/ab/node_ab.txt &
   BENCH_PID=$!
 else
-  run_jmeter $NODE_URL results/node_jmeter.csv &
+  run_jmeter $NODE_URL results/jmeter/node_jmeter.csv &
   BENCH_PID=$!
 fi
-monitor_container_until_pid_exit nodejs-app results/node_usage.csv $BENCH_PID
+monitor_container_until_pid_exit nodejs-app results/ab/node_usage.csv $BENCH_PID
 wait $BENCH_PID
 
 # Generate summary
 echo "Generating summary..."
-SUMMARY_FILE="results/summary.txt"
+SUMMARY_FILE_AB="results/ab/summary.txt"
+SUMMARY_FILE_JMETER="results/jmeter/summary.txt"
 SUMMARY_JSON="../simulation-visual/summary.json"
-: > $SUMMARY_FILE
 if [[ "$MODE" == "ab" ]]; then
-  extract_ab_metrics results/laravel_ab.txt $SUMMARY_FILE "Laravel + Apache Benchmark"
-  extract_timestamps_responseCode_csv results/laravel_ab.txt results/laravel_ab_simple.csv
+  : > $SUMMARY_FILE_AB
 else
-  extract_jmeter_metrics results/laravel_jmeter-resumen.log $SUMMARY_FILE "Laravel + JMeter"
+  : > $SUMMARY_FILE_JMETER
 fi
-echo "Laravel Resource Usage:" >> $SUMMARY_FILE
-analyze_usage results/laravel_usage.csv >> $SUMMARY_FILE
-echo "" >> $SUMMARY_FILE
 if [[ "$MODE" == "ab" ]]; then
-  extract_ab_metrics results/node_ab.txt $SUMMARY_FILE "Node.js Benchmark"
-  extract_timestamps_responseCode_csv results/node_ab.txt results/node_ab_simple.csv
+  extract_ab_metrics results/ab/laravel_ab.txt $SUMMARY_FILE_AB "Laravel + Apache Benchmark"
+  extract_timestamps_responseCode_csv results/ab/laravel_ab.txt results/ab/laravel_ab_simple.csv
 else
-  extract_jmeter_metrics results/node_jmeter-resumen.log $SUMMARY_FILE "Node.js + JMeter"
+  extract_jmeter_metrics results/jmeter/laravel_jmeter-resumen.log $SUMMARY_FILE_JMETER "Laravel + JMeter"
 fi
-echo "Node.js Resource Usage:" >> $SUMMARY_FILE
-analyze_usage results/node_usage.csv >> $SUMMARY_FILE
-echo "" >> $SUMMARY_FILE
-
-cat $SUMMARY_FILE
-echo "Summary saved to $SUMMARY_FILE"
+echo "Laravel Resource Usage:" >> $SUMMARY_FILE_AB
+analyze_usage results/ab/laravel_usage.csv >> $SUMMARY_FILE_AB
+echo "" >> $SUMMARY_FILE_AB
+if [[ "$MODE" == "ab" ]]; then
+  extract_ab_metrics results/ab/node_ab.txt $SUMMARY_FILE_AB "Node.js Benchmark"
+  extract_timestamps_responseCode_csv results/ab/node_ab.txt results/ab/node_ab_simple.csv
+else
+  extract_jmeter_metrics results/jmeter/node_jmeter-resumen.log $SUMMARY_FILE_JMETER "Node.js + JMeter"
+fi
+if [[ "$MODE" == "ab" ]]; then
+echo "Node.js Resource Usage:" >> $SUMMARY_FILE_AB
+analyze_usage results/ab/node_usage.csv >> $SUMMARY_FILE_AB
+echo "" >> $SUMMARY_FILE_AB
+else
+echo "Node.js Resource Usage:" >> $SUMMARY_FILE_JMETER
+analyze_usage results/ab/node_usage.csv >> $SUMMARY_FILE_JMETER
+echo "" >> $SUMMARY_FILE_JMETER
+fi
+if [[ "$MODE" == "ab" ]]; then
+cat $SUMMARY_FILE_AB
+echo "Summary saved to $SUMMARY_FILE_AB"
+else
+cat $SUMMARY_FILE_JMETER
+echo "Summary saved to $SUMMARY_FILE_JMETER"
+fi
