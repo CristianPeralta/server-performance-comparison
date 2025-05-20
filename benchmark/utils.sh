@@ -294,7 +294,7 @@ extract_jmeter_metrics() {
   
   # TODO: Improve this for more servers
   # Verify if summary.json exists
-  if test -f "$SUMMARY_JSON"; then  
+  if test -f "$SUMMARY_JSON_JMETER"; then  
     # If it exists, append the metrics to the file, create it with the end } bracket
     echo -e ",\n  \"$server\": {
     \"avgResponse\": $avg_time,
@@ -302,7 +302,7 @@ extract_jmeter_metrics() {
     \"errors\": $error_count,
     \"complete\": $total_requests,
     \"rps\": $rps
-  }}" >> $SUMMARY_JSON
+  }}" >> $SUMMARY_JSON_JMETER
   else
     # If it doesn't exist, create it with the first { bracket
     echo -e "{\n  \"$server\": {
@@ -311,6 +311,6 @@ extract_jmeter_metrics() {
     \"errors\": $error_count,
     \"complete\": $total_requests,
     \"rps\": $rps
-  }" > $SUMMARY_JSON
+  }" > $SUMMARY_JSON_JMETER
   fi
 }

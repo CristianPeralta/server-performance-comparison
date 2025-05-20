@@ -51,7 +51,8 @@ wait $BENCH_PID
 echo "Generating summary..."
 SUMMARY_FILE_AB="results/ab/summary.txt"
 SUMMARY_FILE_JMETER="results/jmeter/summary.txt"
-SUMMARY_JSON="../simulation-visual/summary.json"
+SUMMARY_JSON_JMETER="../simulation-visual/jmeter/summary.json"
+SUMMARY_JSON_AB="../simulation-visual/ab/summary.json"
 if [[ "$MODE" == "ab" ]]; then
   : > $SUMMARY_FILE_AB
 else
