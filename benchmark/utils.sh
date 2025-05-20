@@ -211,6 +211,16 @@ extract_ab_metrics() {
   local outfile=$2
   local title=$3
 
+  # Detect if is node or laravel
+  # Example extract_jmeter_metrics $SUMMARY_FILE "Laravel + JMeter"
+  local server
+  if [[ "$title" == *"ode"* ]]; then
+    server="node"
+  else
+    server="laravel"
+  fi
+  echo "Server: $server"
+
   echo "=== $title ===" >> $outfile
   echo "" >> $outfile
   
@@ -220,6 +230,23 @@ extract_ab_metrics() {
   grep "Complete requests" $infile >> $outfile
   grep "Requests per second" $infile >> $outfile
   echo "" >> $outfile
+
+  # Append metrics as a JSON object (detecting if is node or laravel)
+  # Get values from ab output
+  local avg_time=$(grep "Time per request" $infile | awk '{print $4}')
+  local rps=$(grep "Requests per second" $infile | awk '{print $4}')
+  local error_count=$(grep "Failed requests" $infile | awk '{print $3}')
+  local total_requests=$(grep "Complete requests" $infile | awk '{print $3}')
+
+  if test -f "$SUMMARY_JSON_AB"; then
+    # If it exists, get the content and update the metrics
+    local metrics=$(jq ". + {\"$server\": {\"avgResponse\": $(echo "$avg_time" | awk '{printf "%.0f", $1}'), \"throughput\": $rps, \"errors\": $error_count, \"complete\": $total_requests, \"rps\": $rps}}" $SUMMARY_JSON_AB)
+    # Replace the content with the new metrics
+    echo "$metrics" > $SUMMARY_JSON_AB
+  else
+    # If it doesn't exist, create it with the first { bracket
+    echo -e "{\n  \"$server\": {\n    \"avgResponse\": $(echo "$avg_time" | awk '{printf "%.0f", $1}'),\n    \"throughput\": $rps,\n    \"errors\": $error_count,\n    \"complete\": $total_requests,\n    \"rps\": $rps\n  }\n}" > $SUMMARY_JSON_AB
+  fi
 }
 
 # Function to extract jmeter metrics
@@ -274,43 +301,14 @@ extract_jmeter_metrics() {
   echo "" >> "$outfile"
 
   # Append metrics as a JSON object (detecting if is node or laravel)
-  # The expected result scheme is this
-  # {
-  #   "laravel": {
-  #     "avgResponse": 83,
-  #     "throughput": 10.7,
-  #     "errors": 0,
-  #     "complete": 643,
-  #     "rps": 10.7
-  #   },
-  #   "node": {
-  #     "avgResponse": 3,
-  #     "throughput": 10.7,
-  #     "errors": 0,
-  #     "complete": 643,
-  #     "rps": 10.7
-  #   }
-  # }
   
-  # TODO: Improve this for more servers
-  # Verify if summary.json exists
-  if test -f "$SUMMARY_JSON_JMETER"; then  
-    # If it exists, append the metrics to the file, create it with the end } bracket
-    echo -e ",\n  \"$server\": {
-    \"avgResponse\": $avg_time,
-    \"throughput\": $rps,
-    \"errors\": $error_count,
-    \"complete\": $total_requests,
-    \"rps\": $rps
-  }}" >> $SUMMARY_JSON_JMETER
+  if test -f "$SUMMARY_JSON_JMETER"; then
+    # If it exists, get the content and update the metrics
+    local metrics=$(jq ". + {\"$server\": {\"avgResponse\": $(echo "$avg_time" | awk '{printf "%.0f", $1}'), \"throughput\": $rps, \"errors\": $error_count, \"complete\": $total_requests, \"rps\": $rps}}" $SUMMARY_JSON_JMETER)
+    # Replace the content with the new metrics
+    echo "$metrics" > $SUMMARY_JSON_JMETER
   else
     # If it doesn't exist, create it with the first { bracket
-    echo -e "{\n  \"$server\": {
-    \"avgResponse\": $avg_time,
-    \"throughput\": $rps,
-    \"errors\": $error_count,
-    \"complete\": $total_requests,
-    \"rps\": $rps
-  }" > $SUMMARY_JSON_JMETER
+    echo -e "{\n  \"$server\": {\n    \"avgResponse\": $(echo "$avg_time" | awk '{printf "%.0f", $1}'),\n    \"throughput\": $rps,\n    \"errors\": $error_count,\n    \"complete\": $total_requests,\n    \"rps\": $rps\n  }\n}" > $SUMMARY_JSON_JMETER
   fi
 }
