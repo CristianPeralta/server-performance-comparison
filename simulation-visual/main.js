@@ -88,6 +88,28 @@ function getLoadCurveFromCsvs() {
 }
 
 // --- Components ---
+// Super tab for selecting load testing tool
+function LoadTestingToolTabs({ loadTestingTool, setLoadTestingTool }) {
+  return (
+    <div className="super-tabs" style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+      <button
+        className={`super-tab${loadTestingTool === 'jmeter' ? ' active' : ''}`}
+        onClick={() => setLoadTestingTool('jmeter')}
+        style={{marginRight: 8, padding: '6px 18px', borderRadius: 5, border: '1px solid #d1d5db', background: loadTestingTool==='jmeter' ? '#e0e7ff' : '#f1f5f9', color: loadTestingTool==='jmeter' ? '#1e293b' : '#64748b', fontWeight: loadTestingTool==='jmeter' ? 600 : 400}}
+      >
+        JMeter
+      </button>
+      <button
+        className={`super-tab${loadTestingTool === 'ab' ? ' active' : ''}`}
+        onClick={() => setLoadTestingTool('ab')}
+        style={{padding: '6px 18px', borderRadius: 5, border: '1px solid #d1d5db', background: loadTestingTool==='ab' ? '#e0e7ff' : '#f1f5f9', color: loadTestingTool==='ab' ? '#1e293b' : '#64748b', fontWeight: loadTestingTool==='ab' ? 600 : 400}}
+      >
+        ab
+      </button>
+    </div>
+  );
+}
+
 function Tabs({ tab, setTab }) {
   return (
     <div className="tabs">
@@ -267,7 +289,7 @@ function SimulationAnim({ running, tab, progress, requests, errors, server }) {
   );
 }
 
-function SimulationPanel({ tab, running, progress, apacheMetrics, nodeMetrics }) {
+function SimulationPanel({ tab, running, progress, apacheMetrics, nodeMetrics, loadTestingTool }) {
   // Prepare data
   const loadData = getLoadCurveFromCsvs();
 
@@ -328,6 +350,7 @@ async function generateRequests(server) {
 }
 
 function App() {
+  const [loadTestingTool, setLoadTestingTool] = useState('jmeter'); // Default to jmeter
   const [tab, setTab] = useState('compare');
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -356,9 +379,17 @@ function App() {
   return (
     <div className="simulation-container">
       <h2 style={{textAlign:'center',marginTop:0}}>Simulation Visual: Apache vs Node.js</h2>
+      <LoadTestingToolTabs loadTestingTool={loadTestingTool} setLoadTestingTool={setLoadTestingTool} />
       <Tabs tab={tab} setTab={setTab} />
       <PlayStop running={running} onPlay={()=>setRunning(true)} onStop={()=>setRunning(false)} />
-      <SimulationPanel tab={tab} running={running} progress={progress} apacheMetrics={apache} nodeMetrics={node} />
+      <SimulationPanel
+        tab={tab}
+        running={running}
+        progress={progress}
+        apacheMetrics={apache}
+        nodeMetrics={node}
+        loadTestingTool={loadTestingTool}
+      />
       <div style={{marginTop:'2rem',fontSize:'0.98rem',textAlign:'center',color:'#64748b'}}>
         <span>Comparing 643 POST requests simulated in 60 seconds (chat traffic)</span>
       </div>
