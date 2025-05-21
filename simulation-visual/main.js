@@ -18,12 +18,13 @@ const DEFAULT_NODE_METRICS = {
 };
 
 // Hook to fetch and parse metrics from summary.txt
-function useDynamicMetrics() {
+// Always use a stable dependency array in useEffect. loadTestingTool should always be a string.
+function useDynamicMetrics(loadTestingTool = 'jmeter') {
   const [apache, setApache] = React.useState(DEFAULT_APACHE_METRICS);
   const [node, setNode] = React.useState(DEFAULT_NODE_METRICS);
 
   React.useEffect(() => {
-    fetch('./jmeter/summary.json')
+    fetch(`./${loadTestingTool}/summary.json`)
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(txt => {
         // Parse metrics for Laravel/Apache
@@ -50,7 +51,7 @@ function useDynamicMetrics() {
         setApache(DEFAULT_APACHE_METRICS);
         setNode(DEFAULT_NODE_METRICS);
       });
-  }, []);
+  }, [loadTestingTool]); // FIX: Always use a stable dependency array
 
   return { apache, node };
 }
@@ -65,11 +66,12 @@ function generateLoadCurve() {
 }
 
 // --- Get load curve from node and laravel csv ---
-function getLoadCurveFromCsvs() {
+// JMeterLoadCurve: render-props pattern for jmeter data
+function JMeterLoadCurve({ children, loadTestingTool }) {
   const time = Array.from({ length: SIMULATION_TIME + 1 }, (_, i) => i);
   const [apache, setApache] = React.useState([]);
   const [node, setNode] = React.useState([]);
-  
+
   React.useEffect(() => {
     Promise.all([
       fetch('jmeter/laravel_jmeter.csv').then(res => res.text()),
@@ -82,10 +84,19 @@ function getLoadCurveFromCsvs() {
       setApache(apache);
       setNode(node);
     });
-  }, []);
+  }, [loadTestingTool]);
 
-  return { time, apache, node };
+  return children({ time, apache, node });
 }
+
+// AbLoadCurve: render-props pattern for ab fake data
+function AbLoadCurve({ children }) {
+  const time = Array.from({ length: SIMULATION_TIME + 1 }, (_, i) => i);
+  const apache = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.92 + Math.random()*0.08)));
+  const node = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.97 + Math.random()*0.04)));
+  return children({ time, apache, node });
+}
+
 
 // --- Components ---
 // Super tab for selecting load testing tool
@@ -129,7 +140,7 @@ function PlayStop({ running, onPlay, onStop }) {
   );
 }
 
-function LineChart({ data, showApache, showNode }) {
+function LineChart({ data, showApache, showNode, loadTestingTool }) {
   const canvasRef = useRef();
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -177,11 +188,11 @@ function LineChart({ data, showApache, showNode }) {
       },
     });
     return () => chart.destroy();
-  }, [data, showApache, showNode]);
+  }, [data, showApache, showNode, loadTestingTool]);
   return <canvas ref={canvasRef} height="110"></canvas>;
 }
 
-function MetricsBar({ apache, node, showApache, showNode }) {
+function MetricsBar({ apache, node, showApache, showNode, loadTestingTool }) {
   // Normalización para altura de barras
   const maxResp = Math.max(apache.avgResponse, node.avgResponse);
   const maxThrough = Math.max(apache.throughput, node.throughput);
@@ -290,41 +301,78 @@ function SimulationAnim({ running, tab, progress, requests, errors, server }) {
 }
 
 function SimulationPanel({ tab, running, progress, apacheMetrics, nodeMetrics, loadTestingTool }) {
-  // Prepare data
-  const loadData = getLoadCurveFromCsvs();
-
-  // State for requests loaded from CSV
+  // State for requests loaded from CSV or fake ab
   const [apacheReqs, setApacheReqs] = React.useState([]);
   const [nodeReqs, setNodeReqs] = React.useState([]);
 
   React.useEffect(() => {
-    generateRequests('apache').then(setApacheReqs);
-    generateRequests('node').then(setNodeReqs);
-  }, []);
+    if (loadTestingTool === 'jmeter') {
+      generateRequests('apache').then(setApacheReqs);
+      generateRequests('node').then(setNodeReqs);
+    } else {
+      generateFakeAbRequests('apache').then(setApacheReqs);
+      generateFakeAbRequests('node').then(setNodeReqs);
+    }
+  }, [loadTestingTool]);
+
   const showApache = tab==='apache'||tab==='compare';
   const showNode = tab==='node'||tab==='compare';
-  return (
-    <div>
-      <LineChart data={loadData} showApache={showApache} showNode={showNode} />
-      <MetricsBar apache={apacheMetrics} node={nodeMetrics} showApache={showApache} showNode={showNode} />
+
+  const renderContent = (loadData) => (
+    <>
+      <LineChart data={loadData} showApache={showApache} showNode={showNode} loadTestingTool={loadTestingTool}/>
+      <MetricsBar apache={apacheMetrics} node={nodeMetrics} showApache={showApache} showNode={showNode} loadTestingTool={loadTestingTool}/>
       {tab==='compare' ? (
         <div className="split-view">
-          <SimulationAnim running={running} tab={tab} progress={progress} requests={apacheReqs} errors={apacheMetrics.errors} server="apache" />
-          <SimulationAnim running={running} tab={tab} progress={progress} requests={nodeReqs} errors={nodeMetrics.errors} server="node" />
+          <SimulationAnim running={running} tab={tab} progress={progress} requests={apacheReqs} errors={apacheMetrics.errors} server="apache"/>
+          <SimulationAnim running={running} tab={tab} progress={progress} requests={nodeReqs} errors={nodeMetrics.errors} server="node"/>
         </div>
       ) : tab==='apache' ? (
-        <SimulationAnim running={running} tab={tab} progress={progress} requests={apacheReqs} errors={apacheMetrics.errors} server="apache" />
+        <SimulationAnim running={running} tab={tab} progress={progress} requests={apacheReqs} errors={apacheMetrics.errors} server="apache"/>
       ) : (
-        <SimulationAnim running={running} tab={tab} progress={progress} requests={nodeReqs} errors={nodeMetrics.errors} server="node" />
+        <SimulationAnim running={running} tab={tab} progress={progress} requests={nodeReqs} errors={nodeMetrics.errors} server="node"/>
       )}
+    </>
+  );
+
+  return (
+    <div>
+      {loadTestingTool === 'jmeter'
+        ? <JMeterLoadCurve loadTestingTool={loadTestingTool}>{renderContent}</JMeterLoadCurve>
+        : <AbLoadCurve>{renderContent}</AbLoadCurve>
+      }
     </div>
   );
+}
+
+// Fake ab load curve generator
+function getFakeAbCurve(loadTestingTool) {
+  console.log(loadTestingTool);
+  const time = Array.from({ length: SIMULATION_TIME + 1 }, (_, i) => i);
+  // Fake: ab is slower and has more errors than node
+  const apache = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.92 + Math.random()*0.08)));
+  const node = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.97 + Math.random()*0.04)));
+  return { time, apache, node };
+}
+
+// Fake ab requests generator
+async function generateFakeAbRequests(server) {
+  // Simulate 643 requests over 60 seconds, with more errors for apache
+  const requests = [];
+  const errorRate = server === 'apache' ? 0.02 : 0.005;
+  for (let i = 0; i < TOTAL_REQUESTS; i++) {
+    const time = Math.random() * SIMULATION_TIME;
+    const status = Math.random() < errorRate ? 'fail' : 'ok';
+    requests.push({ time, status });
+  }
+  // Sort by time
+  return requests.sort((a, b) => a.time - b.time);
 }
 
 // Update generateRequests to accept errors as parameter
 // Refactored: generateRequests now fetches and parses CSV data
 async function generateRequests(server) {
-  // Select CSV file based on server
+  // Only for jmeter; ab uses fake generator
   const csvFile = server === 'apache' ? 'jmeter/laravel_jmeter.csv' : 'jmeter/node_jmeter.csv';
   const res = await fetch(csvFile);
   const text = await res.text();
@@ -355,7 +403,7 @@ function App() {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const timerRef = useRef();
-  const { apache, node } = useDynamicMetrics();
+  const { apache, node } = useDynamicMetrics(loadTestingTool);
 
   // Control the simulation
   useEffect(() => {
