@@ -361,20 +361,6 @@ function getFakeAbCurve(loadTestingTool) {
   return { time, apache, node };
 }
 
-// Fake ab requests generator
-async function generateFakeAbRequests(server) {
-  // Simulate 643 requests over 60 seconds, with more errors for apache
-  const requests = [];
-  const errorRate = server === 'apache' ? 0.02 : 0.005;
-  for (let i = 0; i < TOTAL_REQUESTS; i++) {
-    const time = Math.random() * SIMULATION_TIME;
-    const status = Math.random() < errorRate ? 'fail' : 'ok';
-    requests.push({ time, status });
-  }
-  // Sort by time
-  return requests.sort((a, b) => a.time - b.time);
-}
-
 // Update generateRequests to accept errors as parameter
 // Refactored: generateRequests now fetches and parses CSV data
 async function generateRequestsJmeter(server) {
