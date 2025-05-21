@@ -1,16 +1,16 @@
 {
   "laravel": {
-    "avgResponse": 5656,
-    "throughput": 18,
+    "avgResponse": 52.468,
+    "throughput": 19.06,
     "errors": 0,
     "complete": 643,
-    "rps": 18
+    "rps": 19.06
   },
   "node": {
-    "avgResponse": 0,
-    "throughput": 2610.93,
+    "avgResponse": 0.408,
+    "throughput": 2451.83,
     "errors": 0,
     "complete": 643,
-    "rps": 2610.93
+    "rps": 2451.83
   }
 }

@@ -233,19 +233,22 @@ extract_ab_metrics() {
 
   # Append metrics as a JSON object (detecting if is node or laravel)
   # Get values from ab output
-  local avg_time=$(grep "Time per request" $infile | awk '{print $4}')
+  local avg_time_raw=$(grep "Time per request" "$infile" | head -n1 | awk '{print $4}')
+  local avg_time=$(echo "$avg_time_raw" | tr ',' '.')
   local rps=$(grep "Requests per second" $infile | awk '{print $4}')
   local error_count=$(grep "Failed requests" $infile | awk '{print $3}')
   local total_requests=$(grep "Complete requests" $infile | awk '{print $3}')
 
+  echo "avg_time = '$avg_time'"
+
   if test -f "$SUMMARY_JSON_AB"; then
     # If it exists, get the content and update the metrics
-    local metrics=$(jq ". + {\"$server\": {\"avgResponse\": $(echo "$avg_time" | awk '{printf "%.0f", $1}'), \"throughput\": $rps, \"errors\": $error_count, \"complete\": $total_requests, \"rps\": $rps}}" $SUMMARY_JSON_AB)
+    local metrics=$(jq ". + {\"$server\": {\"avgResponse\": $avg_time, \"throughput\": $rps, \"errors\": $error_count, \"complete\": $total_requests, \"rps\": $rps}}" $SUMMARY_JSON_AB)
     # Replace the content with the new metrics
     echo "$metrics" > $SUMMARY_JSON_AB
   else
     # If it doesn't exist, create it with the first { bracket
-    echo -e "{\n  \"$server\": {\n    \"avgResponse\": $(echo "$avg_time" | awk '{printf "%.0f", $1}'),\n    \"throughput\": $rps,\n    \"errors\": $error_count,\n    \"complete\": $total_requests,\n    \"rps\": $rps\n  }\n}" > $SUMMARY_JSON_AB
+    echo -e "{\n  \"$server\": {\n    \"avgResponse\": $avg_time,\n    \"throughput\": $rps,\n    \"errors\": $error_count,\n    \"complete\": $total_requests,\n    \"rps\": $rps\n  }\n}" > $SUMMARY_JSON_AB
   fi
 }
 
