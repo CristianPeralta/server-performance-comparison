@@ -56,15 +56,6 @@ function useDynamicMetrics(loadTestingTool = 'jmeter') {
   return { apache, node };
 }
 
-// --- Generate load curve data for both servers ---
-function generateLoadCurve() {
-  const time = Array.from({ length: SIMULATION_TIME + 1 }, (_, i) => i);
-  // Simulate accumulated requests with small variations
-  const apache = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.97 + Math.random()*0.06)));
-  const node = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.98 + Math.random()*0.04)));
-  return { time, apache, node };
-}
-
 // --- Get load curve from node and laravel csv ---
 // JMeterLoadCurve: render-props pattern for jmeter data
 function JMeterLoadCurve({ children, loadTestingTool }) {
@@ -90,10 +81,25 @@ function JMeterLoadCurve({ children, loadTestingTool }) {
 }
 
 // AbLoadCurve: render-props pattern for ab fake data
-function AbLoadCurve({ children }) {
+function AbLoadCurve({ children, loadTestingTool }) {
   const time = Array.from({ length: SIMULATION_TIME + 1 }, (_, i) => i);
-  const apache = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.92 + Math.random()*0.08)));
-  const node = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.97 + Math.random()*0.04)));
+  const [apache, setApache] = React.useState([]);
+  const [node, setNode] = React.useState([]);
+
+  React.useEffect(() => {
+    Promise.all([
+      fetch('ab/laravel_ab_simple.csv').then(res => res.text()),
+      fetch('ab/node_ab_simple.csv').then(res => res.text()),
+    ]).then(([laravel_csv, node_csv]) => {
+      const laravel_lines = laravel_csv.split('\n').map(line => line.split(',')[1]);
+      const node_lines = node_csv.split('\n').map(line => line.split(',')[1]);
+      const apache = laravel_lines.map(line => parseInt(line));
+      const node = node_lines.map(line => parseInt(line));
+      setApache(apache);
+      setNode(node);
+    });
+  }, [loadTestingTool]);
+
   return children({ time, apache, node });
 }
 
@@ -307,11 +313,11 @@ function SimulationPanel({ tab, running, progress, apacheMetrics, nodeMetrics, l
 
   React.useEffect(() => {
     if (loadTestingTool === 'jmeter') {
-      generateRequests('apache').then(setApacheReqs);
-      generateRequests('node').then(setNodeReqs);
-    } else {
-      generateFakeAbRequests('apache').then(setApacheReqs);
-      generateFakeAbRequests('node').then(setNodeReqs);
+      generateRequestsJmeter('apache').then(setApacheReqs);
+      generateRequestsJmeter('node').then(setNodeReqs);
+    } else if (loadTestingTool === 'ab') {
+      generateRequestsAb('apache').then(setApacheReqs);
+      generateRequestsAb('node').then(setNodeReqs);
     }
   }, [loadTestingTool]);
 
@@ -339,7 +345,7 @@ function SimulationPanel({ tab, running, progress, apacheMetrics, nodeMetrics, l
     <div>
       {loadTestingTool === 'jmeter'
         ? <JMeterLoadCurve loadTestingTool={loadTestingTool}>{renderContent}</JMeterLoadCurve>
-        : <AbLoadCurve>{renderContent}</AbLoadCurve>
+        : <AbLoadCurve loadTestingTool={loadTestingTool}>{renderContent}</AbLoadCurve>
       }
     </div>
   );
@@ -371,7 +377,7 @@ async function generateFakeAbRequests(server) {
 
 // Update generateRequests to accept errors as parameter
 // Refactored: generateRequests now fetches and parses CSV data
-async function generateRequests(server) {
+async function generateRequestsJmeter(server) {
   // Only for jmeter; ab uses fake generator
   const csvFile = server === 'apache' ? 'jmeter/laravel_jmeter.csv' : 'jmeter/node_jmeter.csv';
   const res = await fetch(csvFile);
@@ -385,7 +391,35 @@ async function generateRequests(server) {
     const cols = lines[i].split(',');
     if (cols.length < 4) continue;
     const timestamp = parseInt(cols[0]);
-    const status = cols[3].trim();
+    const statusIndex = 3;
+    const status = cols[statusIndex].trim();
+    if (!timestamp || isNaN(timestamp)) continue;
+    // Only consider rows with status
+    const time = timestamp - firstTimestamp;
+    requests.push({
+      time: time / 1000, // assuming timestamp is in ms, convert to seconds
+      status: status === '201' ? 'ok' : 'fail',
+    });
+  }
+  return requests;
+}
+
+async function generateRequestsAb(server) {
+  // Only for ab; ab uses fake generator
+  const csvFile = server === 'apache' ? 'ab/laravel_ab_simple.csv' : 'ab/node_ab_simple.csv';
+  const res = await fetch(csvFile);
+  const text = await res.text();
+  const lines = text.split('\n').filter(Boolean);
+  if (lines.length === 0) return [];
+  // Parse CSV rows: timestamp (col 0), status (col 3)
+  const requests = [];
+  const firstTimestamp = parseInt(lines[1].split(',')[0]);
+  for (let i = 0; i < lines.length; i++) {
+    const cols = lines[i].split(',');
+    if (cols.length < 1) continue;
+    const timestamp = parseInt(cols[0]);
+    const statusIndex = 1;
+    const status = cols[statusIndex].trim();
     if (!timestamp || isNaN(timestamp)) continue;
     // Only consider rows with status
     const time = timestamp - firstTimestamp;
