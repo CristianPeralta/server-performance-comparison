@@ -4,17 +4,20 @@ const { useState, useRef, useEffect } = React;
 // --- Simulated data (you can adjust these values) ---
 const SIMULATION_TIME = 60; // seconds
 const TOTAL_REQUESTS = 643;
+const CONCURRENCY = 1;
 
 // Default metrics in case file is not found
 const DEFAULT_APACHE_METRICS = {
   avgResponse: 350, // ms
   throughput: 200, // KB/s
   errors: 7,
+  timeTaken: 60,
 };
 const DEFAULT_NODE_METRICS = {
   avgResponse: 180, // ms
   throughput: 350, // KB/s
   errors: 1,
+  timeTaken: 60,
 };
 
 // Hook to fetch and parse metrics from summary.txt
@@ -42,6 +45,7 @@ function useDynamicMetrics(loadTestingTool = 'jmeter') {
             throughput: Math.round(rps * 20),
             complete,
             rps,
+            timeTaken: section.timeTaken,
           };
         };
         if (laravelSection) setApache(parseSection(laravelSection));
@@ -203,13 +207,16 @@ function MetricsBar({ apache, node, showApache, showNode, loadTestingTool }) {
   const maxResp = Math.max(apache.avgResponse, node.avgResponse);
   const maxThrough = Math.max(apache.throughput, node.throughput);
   const maxErr = Math.max(apache.errors, node.errors);
+  const maxTime = Math.max(apache.timeTaken, node.timeTaken);
 
   const highErr = (server) =>  55 * (maxErr > 0 ? (server.errors/maxErr) : 0) + 5;
   const highResp = (server) => 55 * (maxResp > 0 ? (server.avgResponse/maxResp) : 0) + 5;
   const highThrough = (server) => 55 * (maxThrough > 0 ? (server.throughput/maxThrough) : 0) + 5;
+  const highTime = (server) => 55 * (maxTime > 0 ? (server.timeTaken/maxTime) : 0) + 5;
 
   return (
     <div className="metrics-bar">
+
       <div className="metric">
         <div className="metric-title">⏱️ Average response time (ms)</div>
         <div className="metric-bar">
@@ -235,6 +242,18 @@ function MetricsBar({ apache, node, showApache, showNode, loadTestingTool }) {
         </div>
       </div>
       <div className="metric">
+        <div className="metric-title">⏱️ Time taken (s)</div>
+        <div className="metric-bar">
+          {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: highTime(apache)}} title={apache.timeTaken}></div>}
+          {showNode && <div className="metric-bar-rect metric-bar-node" style={{height: highTime(node)}} title={node.timeTaken}></div>}
+        </div>
+        <div className="metric-label">
+          {showApache && <span style={{color:'#2563eb'}}>Apache: {apache.timeTaken}</span>}
+          {showApache && showNode && <span> | </span>}
+          {showNode && <span style={{color:'#10b981'}}>Node: {node.timeTaken}</span>}
+        </div>
+      </div>
+      <div className="metric">
         <div className="metric-title">❌ Failed requests</div>
         <div className="metric-bar">
           {showApache && <div className="metric-bar-rect metric-bar-apache" style={{height: highErr(apache)}} title={apache.errors}></div>}
@@ -251,7 +270,7 @@ function MetricsBar({ apache, node, showApache, showNode, loadTestingTool }) {
 }
 
 // Animation of requests
-function SimulationAnim({ running, tab, progress, requests, errors, server }) {
+function SimulationAnim({ running, tab, progress, requests, errors, timeTaken, server }) {
   // requests: array of {time, status: 'ok'|'fail'}
   // progress: 0..1
   // server: 'apache' | 'node'
@@ -260,7 +279,7 @@ function SimulationAnim({ running, tab, progress, requests, errors, server }) {
   const icon = server === 'apache' ? '🧭' : '🚀';
   const serverLabel = server === 'apache' ? 'Apache' : 'Node.js';
   // Solo muestra los mensajes que ya "llegaron" según el progreso
-  const shown = requests.filter(r => r.time <= progress * SIMULATION_TIME);
+  const shown = requests.filter(r => r.time <= progress * timeTaken);
   return (
     <div className="simulation-anim">
       <svg className="simulation-svg" viewBox="0 0 440 160">
@@ -276,7 +295,7 @@ function SimulationAnim({ running, tab, progress, requests, errors, server }) {
         </g>
         {/* Mensajes */}
         {shown.map((r,i) => {
-          const frac = Math.min(1, (progress * SIMULATION_TIME - r.time) / 1.2); // animación de viaje
+          const frac = Math.min(1, (progress * timeTaken - r.time) / 1.2); // animación de viaje
           const x = 50 + (290 * frac);
           const y = 80 + (Math.sin(i*0.7)*15);
           return (
@@ -300,13 +319,13 @@ function SimulationAnim({ running, tab, progress, requests, errors, server }) {
       <div className="sim-labels">
         <span>0s</span>
         <span>{serverLabel}</span>
-        <span>60s</span>
+        <span>{timeTaken}s</span>
       </div>
     </div>
   );
 }
 
-function SimulationPanel({ tab, running, progress, apacheMetrics, nodeMetrics, loadTestingTool }) {
+function SimulationPanel({ tab, running, progressApache, progressNode, apacheMetrics, nodeMetrics, loadTestingTool }) {
   // State for requests loaded from CSV or fake ab
   const [apacheReqs, setApacheReqs] = React.useState([]);
   const [nodeReqs, setNodeReqs] = React.useState([]);
@@ -330,13 +349,13 @@ function SimulationPanel({ tab, running, progress, apacheMetrics, nodeMetrics, l
       <MetricsBar apache={apacheMetrics} node={nodeMetrics} showApache={showApache} showNode={showNode} loadTestingTool={loadTestingTool}/>
       {tab==='compare' ? (
         <div className="split-view">
-          <SimulationAnim running={running} tab={tab} progress={progress} requests={apacheReqs} errors={apacheMetrics.errors} server="apache"/>
-          <SimulationAnim running={running} tab={tab} progress={progress} requests={nodeReqs} errors={nodeMetrics.errors} server="node"/>
+          <SimulationAnim running={running} tab={tab} progress={progressApache} requests={apacheReqs} errors={apacheMetrics.errors} timeTaken={apacheMetrics.timeTaken} server="apache"/>
+          <SimulationAnim running={running} tab={tab} progress={progressNode} requests={nodeReqs} errors={nodeMetrics.errors} timeTaken={nodeMetrics.timeTaken} server="node"/>
         </div>
       ) : tab==='apache' ? (
-        <SimulationAnim running={running} tab={tab} progress={progress} requests={apacheReqs} errors={apacheMetrics.errors} server="apache"/>
+        <SimulationAnim running={running} tab={tab} progress={progressApache} requests={apacheReqs} errors={apacheMetrics.errors} timeTaken={apacheMetrics.timeTaken} server="apache"/>
       ) : (
-        <SimulationAnim running={running} tab={tab} progress={progress} requests={nodeReqs} errors={nodeMetrics.errors} server="node"/>
+        <SimulationAnim running={running} tab={tab} progress={progressNode} requests={nodeReqs} errors={nodeMetrics.errors} timeTaken={nodeMetrics.timeTaken} server="node"/>
       )}
     </>
   );
@@ -421,28 +440,48 @@ function App() {
   const [loadTestingTool, setLoadTestingTool] = useState('jmeter'); // Default to jmeter
   const [tab, setTab] = useState('compare');
   const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const timerRef = useRef();
+  const timerRefApache = useRef();
+  const timerRefNode = useRef();
   const { apache, node } = useDynamicMetrics(loadTestingTool);
 
   // Control the simulation
+  const [progressApache, setProgressApache] = useState(0);
+  const [progressNode, setProgressNode] = useState(0);
   useEffect(() => {
     if (!running) {
-      setProgress(0);
-      if (timerRef.current) clearInterval(timerRef.current);
+      setProgressApache(0);
+      if (timerRefApache.current) clearInterval(timerRefApache.current);
       return;
     }
     const start = Date.now();
-    timerRef.current = setInterval(() => {
+    timerRefApache.current = setInterval(() => {
       const elapsed = (Date.now() - start) / 1000;
-      setProgress(Math.min(1, elapsed / SIMULATION_TIME));
-      if (elapsed >= SIMULATION_TIME) {
+      setProgressApache(Math.min(1, elapsed / Math.max(1, apache.timeTaken)));
+      if (elapsed >= Math.max(1, apache.timeTaken)) {
         setRunning(false);
-        clearInterval(timerRef.current);
+        clearInterval(timerRefApache.current);
       }
-    }, 60);
-    return () => clearInterval(timerRef.current);
-  }, [running]);
+    }, Math.max(1, apache.timeTaken));
+    return () => clearInterval(timerRefApache.current);
+  }, [running, apache.timeTaken]);
+
+  useEffect(() => {
+    if (!running) {
+      setProgressNode(0);
+      if (timerRefNode.current) clearInterval(timerRefNode.current);
+      return;
+    }
+    const start = Date.now();
+    timerRefNode.current = setInterval(() => {
+      const elapsed = (Date.now() - start) / 1000;
+      setProgressNode(Math.min(1, elapsed / Math.max(1, node.timeTaken)));
+      if (elapsed >= Math.max(1, node.timeTaken)) {
+        setRunning(false);
+        clearInterval(timerRefNode.current);
+      }
+    }, Math.max(1, node.timeTaken));
+    return () => clearInterval(timerRefNode.current);
+  }, [running, node.timeTaken]);
 
   return (
     <div className="simulation-container">
@@ -453,13 +492,18 @@ function App() {
       <SimulationPanel
         tab={tab}
         running={running}
-        progress={progress}
+        progressApache={progressApache}
+        progressNode={progressNode}
         apacheMetrics={apache}
         nodeMetrics={node}
         loadTestingTool={loadTestingTool}
       />
       <div style={{marginTop:'2rem',fontSize:'0.98rem',textAlign:'center',color:'#64748b'}}>
-        <span>Comparing 643 POST requests simulated in 60 seconds (chat traffic)</span>
+        {loadTestingTool === 'ab' ? (
+          <span>Comparing 643 POST requests simulated with concurrency {CONCURRENCY} (chat traffic)</span>
+        ) : (
+          <span>Comparing 643 POST requests simulated in {Math.max(apache.timeTaken, node.timeTaken)} seconds (chat traffic)</span>
+        )}
       </div>
     </div>
   );
