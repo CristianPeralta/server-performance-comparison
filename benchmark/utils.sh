@@ -238,17 +238,18 @@ extract_ab_metrics() {
   local rps=$(grep "Requests per second" $infile | awk '{print $4}')
   local error_count=$(grep "Failed requests" $infile | awk '{print $3}')
   local total_requests=$(grep "Complete requests" $infile | awk '{print $3}')
+  local time_taken=$(grep "Time taken for tests" $infile | awk '{print $5}')
 
   echo "avg_time = '$avg_time'"
 
   if test -f "$SUMMARY_JSON_AB"; then
     # If it exists, get the content and update the metrics
-    local metrics=$(jq ". + {\"$server\": {\"avgResponse\": $avg_time, \"throughput\": $rps, \"errors\": $error_count, \"complete\": $total_requests, \"rps\": $rps}}" $SUMMARY_JSON_AB)
+    local metrics=$(jq ". + {\"$server\": {\"avgResponse\": $avg_time, \"throughput\": $rps, \"errors\": $error_count, \"complete\": $total_requests, \"rps\": $rps, \"timeTaken\": $time_taken}}" $SUMMARY_JSON_AB)
     # Replace the content with the new metrics
     echo "$metrics" > $SUMMARY_JSON_AB
   else
     # If it doesn't exist, create it with the first { bracket
-    echo -e "{\n  \"$server\": {\n    \"avgResponse\": $avg_time,\n    \"throughput\": $rps,\n    \"errors\": $error_count,\n    \"complete\": $total_requests,\n    \"rps\": $rps\n  }\n}" > $SUMMARY_JSON_AB
+    echo -e "{\n  \"$server\": {\n    \"avgResponse\": $avg_time,\n    \"throughput\": $rps,\n    \"errors\": $error_count,\n    \"complete\": $total_requests,\n    \"rps\": $rps,\n    \"timeTaken\": $time_taken \n  }\n}" > $SUMMARY_JSON_AB
   fi
 }
 
@@ -296,6 +297,9 @@ extract_jmeter_metrics() {
   # Error count - field after "Err:"
   local error_count=$(echo "$final_summary" | awk '{for(i=1;i<=NF;i++) if($i=="Err:") print $(i+1)}')
 
+  # Time taken - default 60 seconds
+  local time_taken=60
+
   # Output metrics
   echo "Time per request: ${avg_time} ms" >> "$outfile"
   echo "Failed requests: ${error_count}" >> "$outfile"
@@ -307,11 +311,11 @@ extract_jmeter_metrics() {
   
   if test -f "$SUMMARY_JSON_JMETER"; then
     # If it exists, get the content and update the metrics
-    local metrics=$(jq ". + {\"$server\": {\"avgResponse\": $(echo "$avg_time" | awk '{printf "%.0f", $1}'), \"throughput\": $rps, \"errors\": $error_count, \"complete\": $total_requests, \"rps\": $rps}}" $SUMMARY_JSON_JMETER)
+    local metrics=$(jq ". + {\"$server\": {\"avgResponse\": $(echo "$avg_time" | awk '{printf "%.0f", $1}'), \"throughput\": $rps, \"errors\": $error_count, \"complete\": $total_requests, \"rps\": $rps, \"timeTaken\": $time_taken}}" $SUMMARY_JSON_JMETER)
     # Replace the content with the new metrics
     echo "$metrics" > $SUMMARY_JSON_JMETER
   else
     # If it doesn't exist, create it with the first { bracket
-    echo -e "{\n  \"$server\": {\n    \"avgResponse\": $(echo "$avg_time" | awk '{printf "%.0f", $1}'),\n    \"throughput\": $rps,\n    \"errors\": $error_count,\n    \"complete\": $total_requests,\n    \"rps\": $rps\n  }\n}" > $SUMMARY_JSON_JMETER
+    echo -e "{\n  \"$server\": {\n    \"avgResponse\": $(echo "$avg_time" | awk '{printf "%.0f", $1}'),\n    \"throughput\": $rps,\n    \"errors\": $error_count,\n    \"complete\": $total_requests,\n    \"rps\": $rps,\n    \"timeTaken\": $time_taken\n  }\n}" > $SUMMARY_JSON_JMETER
   fi
 }
