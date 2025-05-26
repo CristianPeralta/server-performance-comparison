@@ -38,6 +38,7 @@ function useDynamicMetrics(loadTestingTool = 'jmeter') {
           const errors = section.errors;
           const complete = section.complete;
           const rps = section.rps;
+          const timeTaken = section.timeTaken;
           // Throughput is not present, fallback to rps * 20 as a guess
           return {
             avgResponse,
@@ -45,7 +46,7 @@ function useDynamicMetrics(loadTestingTool = 'jmeter') {
             throughput: Math.round(rps * 20),
             complete,
             rps,
-            timeTaken: section.timeTaken,
+            timeTaken,
           };
         };
         if (laravelSection) setApache(parseSection(laravelSection));
@@ -203,7 +204,7 @@ function LineChart({ data, showApache, showNode, loadTestingTool }) {
 }
 
 function MetricsBar({ apache, node, showApache, showNode, loadTestingTool }) {
-  // Normalización para altura de barras
+  // Normalization for bar height
   const maxResp = Math.max(apache.avgResponse, node.avgResponse);
   const maxThrough = Math.max(apache.throughput, node.throughput);
   const maxErr = Math.max(apache.errors, node.errors);
@@ -278,32 +279,32 @@ function SimulationAnim({ running, tab, progress, requests, errors, timeTaken, s
   const color = server === 'apache' ? '#2563eb' : '#10b981';
   const icon = server === 'apache' ? '🧭' : '🚀';
   const serverLabel = server === 'apache' ? 'Apache' : 'Node.js';
-  // Solo muestra los mensajes que ya "llegaron" según el progreso
+  // Only shows the messages that have "arrived" according to progress
   const shown = requests.filter(r => r.time <= progress * timeTaken);
   return (
     <div className="simulation-anim">
       <svg className="simulation-svg" viewBox="0 0 440 160">
-        {/* Cliente */}
+        {/* Client */}
         <g>
           <circle cx="50" cy="80" r="28" fill="#f1f5f9" stroke="#64748b" strokeWidth="2" />
           <text x="50" y="85" textAnchor="middle" fontSize="28">👤</text>
         </g>
-        {/* Servidor */}
+        {/* Server */}
         <g>
           <rect x="340" y="50" width="70" height="60" rx="12" fill={color} />
           <text x="375" y="88" textAnchor="middle" fontSize="28" fill="#fff">{icon}</text>
         </g>
-        {/* Mensajes */}
+        {/* Messages */}
         {shown.map((r,i) => {
-          const frac = Math.min(1, (progress * timeTaken - r.time) / 1.2); // animación de viaje
+          const frac = Math.min(1, (progress * timeTaken - r.time) / 1.2); // animation of travel
           const x = 50 + (290 * frac);
           const y = 80 + (Math.sin(i*0.7)*15);
           return (
             <g key={i}>
-              {/* Mensaje */}
+              {/* Message */}
               <circle cx={x} cy={y} r="10" fill={r.status==='ok'?color:'#ef4444'} opacity={0.93} />
               <text x={x} y={y+5} textAnchor="middle" fontSize="16" fill="#fff">💬</text>
-              {/* Respuesta */}
+              {/* Response */}
               {frac===1 && (
                 <text x={x+30} y={y+5} fontSize="18" fill={r.status==='ok'?"#10b981":"#ef4444"}>
                   {r.status==='ok'?'✅':'❌'}
@@ -325,7 +326,7 @@ function SimulationAnim({ running, tab, progress, requests, errors, timeTaken, s
   );
 }
 
-function SimulationPanel({ tab, running, progressApache, progressNode, apacheMetrics, nodeMetrics, loadTestingTool }) {
+function SimulationPanel({ tab, running, progressApache, progressNode, apacheMetrics, nodeMetrics, loadTestingTool, runningApache, runningNode }) {
   // State for requests loaded from CSV or fake ab
   const [apacheReqs, setApacheReqs] = React.useState([]);
   const [nodeReqs, setNodeReqs] = React.useState([]);
@@ -349,13 +350,13 @@ function SimulationPanel({ tab, running, progressApache, progressNode, apacheMet
       <MetricsBar apache={apacheMetrics} node={nodeMetrics} showApache={showApache} showNode={showNode} loadTestingTool={loadTestingTool}/>
       {tab==='compare' ? (
         <div className="split-view">
-          <SimulationAnim running={running} tab={tab} progress={progressApache} requests={apacheReqs} errors={apacheMetrics.errors} timeTaken={apacheMetrics.timeTaken} server="apache"/>
-          <SimulationAnim running={running} tab={tab} progress={progressNode} requests={nodeReqs} errors={nodeMetrics.errors} timeTaken={nodeMetrics.timeTaken} server="node"/>
+          <SimulationAnim running={runningApache} tab={tab} progress={progressApache} requests={apacheReqs} errors={apacheMetrics.errors} timeTaken={apacheMetrics.timeTaken} server="apache"/>
+          <SimulationAnim running={runningNode} tab={tab} progress={progressNode} requests={nodeReqs} errors={nodeMetrics.errors} timeTaken={nodeMetrics.timeTaken} server="node"/>
         </div>
       ) : tab==='apache' ? (
-        <SimulationAnim running={running} tab={tab} progress={progressApache} requests={apacheReqs} errors={apacheMetrics.errors} timeTaken={apacheMetrics.timeTaken} server="apache"/>
+        <SimulationAnim running={runningApache} tab={tab} progress={progressApache} requests={apacheReqs} errors={apacheMetrics.errors} timeTaken={apacheMetrics.timeTaken} server="apache"/>
       ) : (
-        <SimulationAnim running={running} tab={tab} progress={progressNode} requests={nodeReqs} errors={nodeMetrics.errors} timeTaken={nodeMetrics.timeTaken} server="node"/>
+        <SimulationAnim running={runningNode} tab={tab} progress={progressNode} requests={nodeReqs} errors={nodeMetrics.errors} timeTaken={nodeMetrics.timeTaken} server="node"/>
       )}
     </>
   );
@@ -368,16 +369,6 @@ function SimulationPanel({ tab, running, progressApache, progressNode, apacheMet
       }
     </div>
   );
-}
-
-// Fake ab load curve generator
-function getFakeAbCurve(loadTestingTool) {
-  console.log(loadTestingTool);
-  const time = Array.from({ length: SIMULATION_TIME + 1 }, (_, i) => i);
-  // Fake: ab is slower and has more errors than node
-  const apache = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.92 + Math.random()*0.08)));
-  const node = time.map(t => Math.round((TOTAL_REQUESTS * t / SIMULATION_TIME) * (0.97 + Math.random()*0.04)));
-  return { time, apache, node };
 }
 
 // Update generateRequests to accept errors as parameter
@@ -429,7 +420,7 @@ async function generateRequestsAb(server) {
     // Only consider rows with status
     const time = timestamp - firstTimestamp;
     requests.push({
-      time: time / 1000, // assuming timestamp is in ms, convert to seconds
+      time: time, // assuming timestamp is in ms, convert to seconds
       status: status === '201' ? 'ok' : 'fail',
     });
   }
@@ -440,6 +431,9 @@ function App() {
   const [loadTestingTool, setLoadTestingTool] = useState('jmeter'); // Default to jmeter
   const [tab, setTab] = useState('compare');
   const [running, setRunning] = useState(false);
+  const [runningApache, setRunningApache] = useState(false);
+  const [runningNode, setRunningNode] = useState(false);
+
   const timerRefApache = useRef();
   const timerRefNode = useRef();
   const { apache, node } = useDynamicMetrics(loadTestingTool);
@@ -448,7 +442,7 @@ function App() {
   const [progressApache, setProgressApache] = useState(0);
   const [progressNode, setProgressNode] = useState(0);
   useEffect(() => {
-    if (!running) {
+    if (!runningApache) {
       setProgressApache(0);
       if (timerRefApache.current) clearInterval(timerRefApache.current);
       return;
@@ -456,17 +450,18 @@ function App() {
     const start = Date.now();
     timerRefApache.current = setInterval(() => {
       const elapsed = (Date.now() - start) / 1000;
-      setProgressApache(Math.min(1, elapsed / Math.max(1, apache.timeTaken)));
+      const progress = Math.min(1, elapsed / Math.max(1, apache.timeTaken));
+      setProgressApache(progress);
       if (elapsed >= Math.max(1, apache.timeTaken)) {
-        setRunning(false);
+        setRunningApache(false);
         clearInterval(timerRefApache.current);
       }
     }, Math.max(1, apache.timeTaken));
     return () => clearInterval(timerRefApache.current);
-  }, [running, apache.timeTaken]);
+  }, [runningApache, apache.timeTaken]);
 
   useEffect(() => {
-    if (!running) {
+    if (!runningNode) {
       setProgressNode(0);
       if (timerRefNode.current) clearInterval(timerRefNode.current);
       return;
@@ -474,14 +469,26 @@ function App() {
     const start = Date.now();
     timerRefNode.current = setInterval(() => {
       const elapsed = (Date.now() - start) / 1000;
-      setProgressNode(Math.min(1, elapsed / Math.max(1, node.timeTaken)));
+      const progress = Math.min(1, elapsed / Math.max(1, node.timeTaken));
+      setProgressNode(progress);
       if (elapsed >= Math.max(1, node.timeTaken)) {
-        setRunning(false);
+        setRunningNode(false);
         clearInterval(timerRefNode.current);
       }
     }, Math.max(1, node.timeTaken));
     return () => clearInterval(timerRefNode.current);
-  }, [running, node.timeTaken]);
+  }, [runningNode, node.timeTaken]);
+
+  useEffect(() => {
+    if (running) {
+      setRunningApache(true);
+      setRunningNode(true);
+    }
+    if (!running) {
+      setRunningApache(false);
+      setRunningNode(false);
+    }
+  }, [running]);
 
   return (
     <div className="simulation-container">
@@ -496,6 +503,8 @@ function App() {
         progressNode={progressNode}
         apacheMetrics={apache}
         nodeMetrics={node}
+        runningApache={runningApache}
+        runningNode={runningNode}
         loadTestingTool={loadTestingTool}
       />
       <div style={{marginTop:'2rem',fontSize:'0.98rem',textAlign:'center',color:'#64748b'}}>
