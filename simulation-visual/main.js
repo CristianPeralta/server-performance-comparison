@@ -269,9 +269,12 @@ function MetricsBar({ apache, node, showApache, showNode, loadTestingTool }) {
     </div>
   );
 }
-
+// TODO: Support requests time between 0 and 1 seconds
 // Animation of requests
-function SimulationAnim({ running, tab, progress, requests, errors, timeTaken, server }) {
+function SimulationAnim({ progress, requests, timeTaken, server }) {
+  // Simulated latency to make the animation more visible
+  console.log(requests);
+  const fakeLatency =  0.5; // Adjust as needed for visibility
   // requests: array of {time, status: 'ok'|'fail'}
   // progress: 0..1
   // server: 'apache' | 'node'
@@ -296,7 +299,7 @@ function SimulationAnim({ running, tab, progress, requests, errors, timeTaken, s
         </g>
         {/* Messages */}
         {shown.map((r,i) => {
-          const frac = Math.min(1, (progress * timeTaken - r.time) / 1.2); // animation of travel
+          const frac = Math.min(1, Math.max(0, (progress * timeTaken - r.time) / (r.latency || fakeLatency)));
           const x = 50 + (290 * frac);
           const y = 80 + (Math.sin(i*0.7)*15);
           return (
@@ -390,11 +393,14 @@ async function generateRequestsJmeter(server) {
     const statusIndex = 3;
     const status = cols[statusIndex].trim();
     if (!timestamp || isNaN(timestamp)) continue;
+    const latencyIndex = 14;
+    const latency = parseInt(cols[latencyIndex]);
     // Only consider rows with status
     const time = timestamp - firstTimestamp;
     requests.push({
       time: time / 1000, // assuming timestamp is in ms, convert to seconds
       status: status === '201' ? 'ok' : 'fail',
+      latency: latency / 1000,
     });
   }
   return requests;
@@ -422,6 +428,7 @@ async function generateRequestsAb(server) {
     requests.push({
       time: time, // assuming timestamp is in ms, convert to seconds
       status: status === '201' ? 'ok' : 'fail',
+      latency: 0.5 / 1000 // TODO: get latency from summary CSV
     });
   }
   return requests;
