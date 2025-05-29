@@ -61,54 +61,6 @@ function useDynamicMetrics(loadTestingTool = 'jmeter') {
   return { apache, node };
 }
 
-// --- Get load curve from node and laravel csv ---
-// JMeterLoadCurve: render-props pattern for jmeter data
-function JMeterLoadCurve({ children, loadTestingTool }) {
-  const time = Array.from({ length: SIMULATION_TIME + 1 }, (_, i) => i);
-  const [apache, setApache] = React.useState([]);
-  const [node, setNode] = React.useState([]);
-
-  React.useEffect(() => {
-    Promise.all([
-      fetch('jmeter/laravel_jmeter.csv').then(res => res.text()),
-      fetch('jmeter/node_jmeter.csv').then(res => res.text()),
-    ]).then(([laravel_csv, node_csv]) => {
-      const laravel_lines = laravel_csv.split('\n').map(line => line.split(',')[14]);
-      const node_lines = node_csv.split('\n').map(line => line.split(',')[14]);
-      const apache = laravel_lines.map(line => parseInt(line));
-      const node = node_lines.map(line => parseInt(line));
-      setApache(apache);
-      setNode(node);
-    });
-  }, [loadTestingTool]);
-
-  return children({ time, apache, node });
-}
-
-// AbLoadCurve: render-props pattern for ab fake data
-function AbLoadCurve({ children, loadTestingTool }) {
-  const time = Array.from({ length: SIMULATION_TIME + 1 }, (_, i) => i);
-  const [apache, setApache] = React.useState([]);
-  const [node, setNode] = React.useState([]);
-
-  React.useEffect(() => {
-    Promise.all([
-      fetch('ab/laravel_ab_simple.csv').then(res => res.text()),
-      fetch('ab/node_ab_simple.csv').then(res => res.text()),
-    ]).then(([laravel_csv, node_csv]) => {
-      const laravel_lines = laravel_csv.split('\n').map(line => line.split(',')[1]);
-      const node_lines = node_csv.split('\n').map(line => line.split(',')[1]);
-      const apache = laravel_lines.map(line => parseInt(line));
-      const node = node_lines.map(line => parseInt(line));
-      setApache(apache);
-      setNode(node);
-    });
-  }, [loadTestingTool]);
-
-  return children({ time, apache, node });
-}
-
-
 // --- Components ---
 // Super tab for selecting load testing tool
 function LoadTestingToolTabs({ loadTestingTool, setLoadTestingTool }) {
@@ -151,18 +103,20 @@ function PlayStop({ running, onPlay, onStop }) {
   );
 }
 
-function LineChart({ data, showApache, showNode, loadTestingTool }) {
+function LineChart({ time, apache, node, showApache, showNode, loadTestingTool }) {
   const canvasRef = useRef();
   useEffect(() => {
+    // TODO: Check that the line chart values while running are the same as the values shown at the end
+    // This is important to ensure the chart is consistent and doesn't show incorrect data
     if (!canvasRef.current) return;
     const chart = new Chart(canvasRef.current, {
       type: 'line',
       data: {
-        labels: data.time,
+        labels: time,
         datasets: [
           showApache && {
             label: 'Apache',
-            data: data.apache,
+            data: apache,
             borderColor: '#2563eb',
             backgroundColor: 'rgba(37,99,235,0.08)',
             tension: 0.22,
@@ -171,7 +125,7 @@ function LineChart({ data, showApache, showNode, loadTestingTool }) {
           },
           showNode && {
             label: 'Node.js',
-            data: data.node,
+            data: node,
             borderColor: '#10b981',
             backgroundColor: 'rgba(16,185,129,0.08)',
             tension: 0.22,
@@ -199,7 +153,7 @@ function LineChart({ data, showApache, showNode, loadTestingTool }) {
       },
     });
     return () => chart.destroy();
-  }, [data, showApache, showNode, loadTestingTool]);
+  }, [time, apache, node, showApache, showNode]);
   return <canvas ref={canvasRef} height="110"></canvas>;
 }
 
@@ -346,9 +300,12 @@ function SimulationPanel({ tab, running, progressApache, progressNode, apacheMet
   const showApache = tab==='apache'||tab==='compare';
   const showNode = tab==='node'||tab==='compare';
 
-  const renderContent = (loadData) => (
-    <>
-      <LineChart data={loadData} showApache={showApache} showNode={showNode} loadTestingTool={loadTestingTool}/>
+  return (
+    <div>
+      {loadTestingTool === 'jmeter'
+        ? <LineChart time={apacheReqs.map(r => r.time)} apache={apacheReqs.map(r => r.latency)} node={nodeReqs.map(r => r.latency)} showApache={showApache} showNode={showNode} loadTestingTool={loadTestingTool}/>
+        : <LineChart time={apacheReqs.map(r => r.time)} apache={apacheReqs.map(r => r.latency)} node={nodeReqs.map(r => r.latency)} showApache={showApache} showNode={showNode} loadTestingTool={loadTestingTool}/>
+      }
       <MetricsBar apache={apacheMetrics} node={nodeMetrics} showApache={showApache} showNode={showNode} loadTestingTool={loadTestingTool}/>
       {tab==='compare' ? (
         <div className="split-view">
@@ -360,15 +317,6 @@ function SimulationPanel({ tab, running, progressApache, progressNode, apacheMet
       ) : (
         <SimulationAnim running={runningNode} tab={tab} progress={progressNode} requests={nodeReqs} errors={nodeMetrics.errors} timeTaken={nodeMetrics.timeTaken} server="node"/>
       )}
-    </>
-  );
-
-  return (
-    <div>
-      {loadTestingTool === 'jmeter'
-        ? <JMeterLoadCurve loadTestingTool={loadTestingTool}>{renderContent}</JMeterLoadCurve>
-        : <AbLoadCurve loadTestingTool={loadTestingTool}>{renderContent}</AbLoadCurve>
-      }
     </div>
   );
 }
