@@ -273,7 +273,6 @@ function MetricsBar({ apache, node, showApache, showNode, loadTestingTool }) {
 // Animation of requests
 function SimulationAnim({ progress, requests, timeTaken, server }) {
   // Simulated latency to make the animation more visible
-  console.log(requests);
   const fakeLatency =  0.5; // Adjust as needed for visibility
   // requests: array of {time, status: 'ok'|'fail'}
   // progress: 0..1
@@ -339,10 +338,10 @@ function SimulationPanel({ tab, running, progressApache, progressNode, apacheMet
       generateRequestsJmeter('apache').then(setApacheReqs);
       generateRequestsJmeter('node').then(setNodeReqs);
     } else if (loadTestingTool === 'ab') {
-      generateRequestsAb('apache').then(setApacheReqs);
-      generateRequestsAb('node').then(setNodeReqs);
+      generateRequestsAb('apache', apacheMetrics).then(setApacheReqs);
+      generateRequestsAb('node', nodeMetrics).then(setNodeReqs);
     }
-  }, [loadTestingTool]);
+  }, [loadTestingTool, apacheMetrics, nodeMetrics]);
 
   const showApache = tab==='apache'||tab==='compare';
   const showNode = tab==='node'||tab==='compare';
@@ -406,7 +405,7 @@ async function generateRequestsJmeter(server) {
   return requests;
 }
 
-async function generateRequestsAb(server) {
+async function generateRequestsAb(server, {avgResponse}) {
   // Only for ab; ab uses fake generator
   const csvFile = server === 'apache' ? 'ab/laravel_ab_simple.csv' : 'ab/node_ab_simple.csv';
   const res = await fetch(csvFile);
@@ -428,7 +427,7 @@ async function generateRequestsAb(server) {
     requests.push({
       time: time, // assuming timestamp is in ms, convert to seconds
       status: status === '201' ? 'ok' : 'fail',
-      latency: 0.5 / 1000 // TODO: get latency from summary CSV
+      latency: avgResponse / 1000,
     });
   }
   return requests;
