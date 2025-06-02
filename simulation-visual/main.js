@@ -287,6 +287,13 @@ function SimulationPanel({ tab, running, progressApache, progressNode, apacheMet
   const [apacheReqs, setApacheReqs] = React.useState([]);
   const [nodeReqs, setNodeReqs] = React.useState([]);
 
+  // State for animated chart data
+  const [visibleApache, setVisibleApache] = React.useState([]);
+  const [visibleNode, setVisibleNode] = React.useState([]);
+  const [visibleTime, setVisibleTime] = React.useState([]);
+  const apacheTimerRef = React.useRef();
+  const nodeTimerRef = React.useRef();
+
   React.useEffect(() => {
     if (loadTestingTool === 'jmeter') {
       generateRequestsJmeter('apache').then(setApacheReqs);
@@ -297,15 +304,69 @@ function SimulationPanel({ tab, running, progressApache, progressNode, apacheMet
     }
   }, [loadTestingTool, apacheMetrics, nodeMetrics]);
 
+  // Animation effect for Apache
+  React.useEffect(() => {
+    if (!runningApache) {
+      setVisibleApache(apacheReqs.map(r => r.latency));
+      setVisibleTime(apacheReqs.map(r => r.time));
+      if (apacheTimerRef.current) clearTimeout(apacheTimerRef.current);
+      return;
+    }
+    setVisibleApache([]);
+    setVisibleTime([]);
+    let i = 0;
+    function step() {
+      if (i < apacheReqs.length) {
+        setVisibleApache(prev => [...prev, apacheReqs[i].latency]);
+        setVisibleTime(prev => [...prev, apacheReqs[i].time]);
+        const delay = (i === 0 ? 0 : (apacheReqs[i].time - apacheReqs[i-1].time) * 1000);
+        i++;
+        apacheTimerRef.current = setTimeout(step, delay > 0 ? delay : 10);
+      }
+    }
+    step();
+    return () => apacheTimerRef.current && clearTimeout(apacheTimerRef.current);
+  }, [runningApache, apacheReqs]);
+
+  // Animation effect for Node
+  React.useEffect(() => {
+    if (!runningNode) {
+      setVisibleNode(nodeReqs.map(r => r.latency));
+      if (nodeTimerRef.current) clearTimeout(nodeTimerRef.current);
+      return;
+    }
+    setVisibleNode([]);
+    let i = 0;
+    function step() {
+      if (i < nodeReqs.length) {
+        setVisibleNode(prev => [...prev, nodeReqs[i].latency]);
+        const delay = (i === 0 ? 0 : (nodeReqs[i].time - nodeReqs[i-1].time) * 1000);
+        i++;
+        nodeTimerRef.current = setTimeout(step, delay > 0 ? delay : 10);
+      }
+    }
+    step();
+    return () => nodeTimerRef.current && clearTimeout(nodeTimerRef.current);
+  }, [runningNode, nodeReqs]);
+
   const showApache = tab==='apache'||tab==='compare';
   const showNode = tab==='node'||tab==='compare';
 
+  // Use animated data if running, otherwise show all
+  const chartTime = runningApache ? visibleTime : apacheReqs.map(r => r.time);
+  const chartApache = runningApache ? visibleApache : apacheReqs.map(r => r.latency);
+  const chartNode = runningNode ? visibleNode : nodeReqs.map(r => r.latency);
+
   return (
     <div>
-      {loadTestingTool === 'jmeter'
-        ? <LineChart time={apacheReqs.map(r => r.time)} apache={apacheReqs.map(r => r.latency)} node={nodeReqs.map(r => r.latency)} showApache={showApache} showNode={showNode} loadTestingTool={loadTestingTool}/>
-        : <LineChart time={apacheReqs.map(r => r.time)} apache={apacheReqs.map(r => r.latency)} node={nodeReqs.map(r => r.latency)} showApache={showApache} showNode={showNode} loadTestingTool={loadTestingTool}/>
-      }
+      <LineChart
+        time={chartTime.length > chartNode.length ? chartTime : nodeReqs.map(r => r.time)}
+        apache={chartApache}
+        node={chartNode}
+        showApache={showApache}
+        showNode={showNode}
+        loadTestingTool={loadTestingTool}
+      />
       <MetricsBar apache={apacheMetrics} node={nodeMetrics} showApache={showApache} showNode={showNode} loadTestingTool={loadTestingTool}/>
       {tab==='compare' ? (
         <div className="split-view">
@@ -410,7 +471,7 @@ function App() {
         setRunningApache(false);
         clearInterval(timerRefApache.current);
       }
-    }, Math.max(1, apache.timeTaken));
+    }, 100);
     return () => clearInterval(timerRefApache.current);
   }, [runningApache, apache.timeTaken]);
 
@@ -429,7 +490,7 @@ function App() {
         setRunningNode(false);
         clearInterval(timerRefNode.current);
       }
-    }, Math.max(1, node.timeTaken));
+    }, 100);
     return () => clearInterval(timerRefNode.current);
   }, [runningNode, node.timeTaken]);
 
