@@ -1,5 +1,5 @@
 // main.js
-const { useState, useRef, useEffect } = React;
+const { useState, useRef, useEffect, useMemo } = React;
 
 // --- Simulated data (you can adjust these values) ---
 const SIMULATION_TIME = 60; // seconds
@@ -103,20 +103,22 @@ function PlayStop({ running, onPlay, onStop }) {
   );
 }
 
-function LineChart({ time, apache, node, showApache, showNode, loadTestingTool }) {
+function LineChart({ apachePoints, nodePoints, showApache, showNode, loadTestingTool, maxTime, maxLatency }) {
   const canvasRef = useRef();
   useEffect(() => {
     // TODO: Check that the line chart values while running are the same as the values shown at the end
     // This is important to ensure the chart is consistent and doesn't show incorrect data
+    console.log(apachePoints, nodePoints);
+    console.log(maxTime, maxLatency);
     if (!canvasRef.current) return;
     const chart = new Chart(canvasRef.current, {
       type: 'line',
       data: {
-        labels: time,
+        // labels: time, // Removed: x-values are now in datasets
         datasets: [
           showApache && {
             label: 'Apache',
-            data: apache,
+            data: apachePoints, // Expects array of {x, y}
             borderColor: '#2563eb',
             backgroundColor: 'rgba(37,99,235,0.08)',
             tension: 0.22,
@@ -125,7 +127,7 @@ function LineChart({ time, apache, node, showApache, showNode, loadTestingTool }
           },
           showNode && {
             label: 'Node.js',
-            data: node,
+            data: nodePoints, // Expects array of {x, y}
             borderColor: '#10b981',
             backgroundColor: 'rgba(16,185,129,0.08)',
             tension: 0.22,
@@ -141,19 +143,23 @@ function LineChart({ time, apache, node, showApache, showNode, loadTestingTool }
         },
         scales: {
           x: {
+            min: 0,
+            max: maxTime,
+            type: 'linear', // Specify x-axis type for {x,y} data
             title: { display: true, text: 'Time (seconds)' },
             ticks: { color: '#64748b' },
           },
           y: {
             title: { display: true, text: 'Latency (ms)' },
             beginAtZero: true,
+            max: maxLatency, // Use passed maxLatency
             ticks: { color: '#64748b' },
           },
         },
       },
     });
     return () => chart.destroy();
-  }, [time, apache, node, showApache, showNode]);
+  }, [apachePoints, nodePoints, showApache, showNode, maxTime]); // Added maxLatency to dependencies
   return <canvas ref={canvasRef} height="110"></canvas>;
 }
 
@@ -287,12 +293,41 @@ function SimulationPanel({ tab, running, progressApache, progressNode, apacheMet
   const [apacheReqs, setApacheReqs] = React.useState([]);
   const [nodeReqs, setNodeReqs] = React.useState([]);
 
-  // State for animated chart data
-  const [visibleApache, setVisibleApache] = React.useState([]);
-  const [visibleNode, setVisibleNode] = React.useState([]);
-  const [visibleTime, setVisibleTime] = React.useState([]);
-  const apacheTimerRef = React.useRef();
-  const nodeTimerRef = React.useRef();
+  // New state for animated chart data points {x, y}
+  const [animatedApachePoints, setAnimatedApachePoints] = React.useState([]);
+  const [animatedNodePoints, setAnimatedNodePoints] = React.useState([]);
+
+  const animationTimerRef = React.useRef(null); // Timer for chart animation
+
+  const maxLatency = React.useMemo(() => {
+    const allPossibleLatencies = [
+      ...(apacheReqs || []).map(r => r.latency),
+      ...(nodeReqs || []).map(r => r.latency)
+    ].filter(l => typeof l === 'number' && isFinite(l)); // Ensure only valid numbers
+
+    if (allPossibleLatencies.length === 0) {
+      return 100; // Default max if no data or all latencies are 0/invalid
+    }
+    const actualMax = Math.max(...allPossibleLatencies);
+    // Add 10% padding, ensure min if max is 0. Ensure it's at least a bit above 0 for visibility.
+    const paddedMax = actualMax > 0 ? actualMax * 1.1 : 100;
+    return paddedMax;
+  }, [apacheReqs, nodeReqs]);
+
+  const maxTime = React.useMemo(() => {
+    const allPossibleTimes = [
+      ...(apacheReqs || []).map(r => r.time),
+      ...(nodeReqs || []).map(r => r.time)
+    ].filter(t => typeof t === 'number' && isFinite(t)); // Ensure only valid numbers
+
+    if (allPossibleTimes.length === 0) {
+      return 100; // Default max if no data or all times are 0/invalid
+    }
+    const actualMax = Math.max(...allPossibleTimes);
+    // Add 10% padding, ensure min if max is 0. Ensure it's at least a bit above 0 for visibility.
+    const paddedMax = actualMax > 0 ? actualMax : 100;
+    return paddedMax;
+  }, [apacheReqs, nodeReqs]);
 
   React.useEffect(() => {
     if (loadTestingTool === 'jmeter') {
@@ -304,71 +339,118 @@ function SimulationPanel({ tab, running, progressApache, progressNode, apacheMet
     }
   }, [loadTestingTool, apacheMetrics, nodeMetrics]);
 
-  // Animation effect for Apache
+  // New animation useEffect for LineChart data
   React.useEffect(() => {
-    if (!runningApache) {
-      setVisibleApache(apacheReqs.map(r => r.latency));
-      setVisibleTime(apacheReqs.map(r => r.time));
-      if (apacheTimerRef.current) clearTimeout(apacheTimerRef.current);
-      return;
-    }
-    setVisibleApache([]);
-    setVisibleTime([]);
-    let i = 0;
-    function step() {
-      if (i < apacheReqs.length) {
-        setVisibleApache(prev => [...prev, apacheReqs[i].latency]);
-        setVisibleTime(prev => [...prev, apacheReqs[i].time]);
-        const delay = (i === 0 ? 0 : (apacheReqs[i].time - apacheReqs[i-1].time) * 1000);
-        i++;
-        apacheTimerRef.current = setTimeout(step, delay > 0 ? delay : 10);
+    const cleanup = () => {
+      if (animationTimerRef.current) {
+        clearTimeout(animationTimerRef.current);
+        animationTimerRef.current = null;
       }
-    }
-    step();
-    return () => apacheTimerRef.current && clearTimeout(apacheTimerRef.current);
-  }, [runningApache, apacheReqs]);
+    };
 
-  // Animation effect for Node
-  React.useEffect(() => {
-    if (!runningNode) {
-      setVisibleNode(nodeReqs.map(r => r.latency));
-      if (nodeTimerRef.current) clearTimeout(nodeTimerRef.current);
-      return;
+    const isCurrentlySimulating = runningApache || runningNode;
+
+    if (!isCurrentlySimulating) {
+      return cleanup; 
     }
-    setVisibleNode([]);
-    let i = 0;
-    function step() {
-      if (i < nodeReqs.length) {
-        setVisibleNode(prev => [...prev, nodeReqs[i].latency]);
-        const delay = (i === 0 ? 0 : (nodeReqs[i].time - nodeReqs[i-1].time) * 1000);
-        i++;
-        nodeTimerRef.current = setTimeout(step, delay > 0 ? delay : 10);
+
+    // --- Simulation is active ---
+    setAnimatedApachePoints([]); 
+    setAnimatedNodePoints([]); 
+
+    const chartEvents = [];
+
+    if (runningApache && apacheReqs) {
+      apacheReqs.forEach(req => {
+        if (typeof req.time === 'number' && typeof req.latency === 'number' && isFinite(req.time) && isFinite(req.latency)) {
+          chartEvents.push({
+            plotTime: req.time + req.latency,
+            server: 'apache',
+            pointData: { x: req.time, y: req.latency }
+          });
+        }
+      });
+    }
+
+    if (runningNode && nodeReqs) {
+      nodeReqs.forEach(req => {
+        if (typeof req.time === 'number' && typeof req.latency === 'number' && isFinite(req.time) && isFinite(req.latency)) {
+          chartEvents.push({
+            plotTime: req.time + req.latency,
+            server: 'node',
+            pointData: { x: req.time, y: req.latency }
+          });
+        }
+      });
+    }
+    
+    chartEvents.sort((a, b) => a.plotTime - b.plotTime);
+
+    if (chartEvents.length === 0) {
+      return cleanup; 
+    }
+
+    let eventIndex = 0;
+    let lastProcessedPlotTime = 0; 
+
+    function processNextEvent() {
+      if (eventIndex >= chartEvents.length) {
+        animationTimerRef.current = null; 
+        return; 
       }
+
+      const currentEvent = chartEvents[eventIndex];
+      const delayMilliseconds = Math.max(0, (currentEvent.plotTime - lastProcessedPlotTime) * 1000);
+
+      animationTimerRef.current = setTimeout(() => {
+        if (currentEvent.server === 'apache') {
+          setAnimatedApachePoints(prevPoints => 
+            [...prevPoints, currentEvent.pointData].sort((a, b) => a.x - b.x)
+          );
+        } else if (currentEvent.server === 'node') {
+          setAnimatedNodePoints(prevPoints => 
+            [...prevPoints, currentEvent.pointData].sort((a, b) => a.x - b.x)
+          );
+        }
+        
+        lastProcessedPlotTime = currentEvent.plotTime;
+        eventIndex++;
+        processNextEvent();
+      }, delayMilliseconds);
     }
-    step();
-    return () => nodeTimerRef.current && clearTimeout(nodeTimerRef.current);
-  }, [runningNode, nodeReqs]);
+
+    processNextEvent(); 
+
+    return cleanup; 
+  }, [runningApache, runningNode, apacheReqs, nodeReqs]);
 
   const showApache = tab==='apache'||tab==='compare';
   const showNode = tab==='node'||tab==='compare';
 
-  // Use animated data if running, otherwise show all
-  let chartTime = runningApache ? visibleTime : apacheReqs.map(r => r.time);
-  if (runningNode && nodeReqs.length > chartTime.length) {
-    chartTime = nodeReqs.map(r => r.time);
-  }
-  const chartApache = runningApache ? visibleApache : apacheReqs.map(r => r.latency);
-  const chartNode = runningNode ? visibleNode : nodeReqs.map(r => r.latency);
+  const isSimulating = runningApache || runningNode; 
+
+  const fullApachePoints = React.useMemo(() => 
+    (apacheReqs || []).map(r => ({ x: r.time, y: r.latency })).sort((a,b) => a.x - b.x), 
+    [apacheReqs]
+  );
+  const fullNodePoints = React.useMemo(() => 
+    (nodeReqs || []).map(r => ({ x: r.time, y: r.latency })).sort((a,b) => a.x - b.x), 
+    [nodeReqs]
+  );
+
+  const currentApachePoints = isSimulating ? animatedApachePoints : fullApachePoints;
+  const currentNodePoints = isSimulating ? animatedNodePoints : fullNodePoints;
 
   return (
     <div>
       <LineChart
-        time={chartTime}
-        apache={chartApache}
-        node={chartNode}
+        apachePoints={currentApachePoints}
+        nodePoints={currentNodePoints}
         showApache={showApache}
         showNode={showNode}
         loadTestingTool={loadTestingTool}
+        maxLatency={maxLatency}
+        maxTime={maxTime}
       />
       <MetricsBar apache={apacheMetrics} node={nodeMetrics} showApache={showApache} showNode={showNode} loadTestingTool={loadTestingTool}/>
       {tab==='compare' ? (
