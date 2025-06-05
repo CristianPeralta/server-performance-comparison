@@ -1,18 +1,18 @@
 {
   "laravel": {
-    "avgResponse": 53.518,
-    "throughput": 18.69,
+    "avgResponse": 53.8,
+    "throughput": 18.59,
     "errors": 0,
     "complete": 643,
-    "rps": 18.69,
-    "timeTaken": 34.412
+    "rps": 18.59,
+    "timeTaken": 34.594
   },
   "node": {
-    "avgResponse": 0.601,
-    "throughput": 1663.33,
+    "avgResponse": 0.529,
+    "throughput": 1891.55,
     "errors": 0,
     "complete": 643,
-    "rps": 1663.33,
-    "timeTaken": 0.387
+    "rps": 1891.55,
+    "timeTaken": 0.34
   }
 }

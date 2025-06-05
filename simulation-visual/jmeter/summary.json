@@ -8,7 +8,7 @@
     "timeTaken": 60
   },
   "node": {
-    "avgResponse": 4,
+    "avgResponse": 5,
     "throughput": 10.7,
     "errors": 0,
     "complete": 643,

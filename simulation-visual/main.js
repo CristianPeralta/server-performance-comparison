@@ -353,14 +353,17 @@ function SimulationPanel({ tab, running, progressApache, progressNode, apacheMet
   const showNode = tab==='node'||tab==='compare';
 
   // Use animated data if running, otherwise show all
-  const chartTime = runningApache ? visibleTime : apacheReqs.map(r => r.time);
+  let chartTime = runningApache ? visibleTime : apacheReqs.map(r => r.time);
+  if (runningNode && nodeReqs.length > chartTime.length) {
+    chartTime = nodeReqs.map(r => r.time);
+  }
   const chartApache = runningApache ? visibleApache : apacheReqs.map(r => r.latency);
   const chartNode = runningNode ? visibleNode : nodeReqs.map(r => r.latency);
 
   return (
     <div>
       <LineChart
-        time={chartTime.length > chartNode.length ? chartTime : nodeReqs.map(r => r.time)}
+        time={chartTime}
         apache={chartApache}
         node={chartNode}
         showApache={showApache}
