@@ -1,0 +1,18 @@
+{
+  "laravel": {
+    "avgResponse": 64,
+    "throughput": 10.7,
+    "errors": 0,
+    "complete": 643,
+    "rps": 10.7,
+    "timeTaken": 60
+  },
+  "node": {
+    "avgResponse": 5,
+    "throughput": 10.7,
+    "errors": 0,
+    "complete": 643,
+    "rps": 10.7,
+    "timeTaken": 60
+  }
+}
