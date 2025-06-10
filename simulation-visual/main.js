@@ -324,73 +324,8 @@ function SimulationPanel({ tab, running, progressApache, progressNode, apacheMet
   const showApache = tab==='apache'||tab==='compare';
   const showNode = tab==='node'||tab==='compare';
 
-  const isSimulating = runningApache || runningNode;
-
-  const [simulatedApachePoints, setSimulatedApachePoints] = React.useState([]); 
-  const [simulatedNodePoints, setSimulatedNodePoints] = React.useState([]); 
-
-  React.useEffect(() => {
-    if (!isSimulating) {
-      // No simulation is active, interval cleanup from previous effect run handles stopping.
-      return;
-    }
-
-    // IS SIMULATING: Reset points for the new simulation run.
-    setSimulatedApachePoints([]);
-    setSimulatedNodePoints([]);
-
-    let apacheIndex = 0;
-    let nodeIndex = 0;
-    const startTime = performance.now();
-    const SIMULATION_SPEED = 1.0;
-
-    const intervalId = setInterval(() => {
-      const elapsed = (performance.now() - startTime) * SIMULATION_SPEED;
-      let newApacheBatch = [];
-      if (runningApache) {
-        while (apacheIndex < apacheData.length && apacheData[apacheIndex].x <= elapsed) {
-          newApacheBatch.push(apacheData[apacheIndex]);
-          apacheIndex++;
-        }
-      }
-      if (newApacheBatch.length) setSimulatedApachePoints(prev => [...prev, ...newApacheBatch].sort((a,b) => a.x - b.x));
-
-      let newNodeBatch = [];
-      if (runningNode) {
-        while (nodeIndex < nodeData.length && nodeData[nodeIndex].x <= elapsed) {
-          newNodeBatch.push(nodeData[nodeIndex]);
-          nodeIndex++;
-        }
-      }
-      if (newNodeBatch.length) setSimulatedNodePoints(prev => [...prev, ...newNodeBatch].sort((a,b) => a.x - b.x));
-
-      const apacheDone = !runningApache || apacheIndex >= apacheData.length;
-      const nodeDone = !runningNode || nodeIndex >= nodeData.length;
-
-      if (apacheDone && nodeDone) {
-        clearInterval(intervalId);
-      }
-    }, 100);
-
-    return () => clearInterval(intervalId);
-  }, [isSimulating, runningApache, runningNode, apacheData, nodeData]);
-
-  const displayApachePoints = isSimulating ? simulatedApachePoints : apacheData;
-  const displayNodePoints = isSimulating ? simulatedNodePoints : nodeData;
-
-  const maxLatency = React.useMemo(() => {
-    const pointsToConsider = isSimulating ? [...simulatedApachePoints, ...simulatedNodePoints] : [...apacheData, ...nodeData];
-    const latencies = pointsToConsider.map(p => p.y).filter(Number.isFinite);
-    if (!latencies.length) return 100; 
-    return Math.max(...latencies) * 1.1; 
-  }, [isSimulating, simulatedApachePoints, simulatedNodePoints, apacheData, nodeData]);
-
-  const maxTime = React.useMemo(() => {
-    const pointsToConsider = isSimulating ? [...simulatedApachePoints, ...simulatedNodePoints] : [...apacheData, ...nodeData];
-    const times = pointsToConsider.map(p => p.x).filter(Number.isFinite);
-    if (!times.length) return 100; 
-    return Math.max(...times) * 1.05; 
-  }, [isSimulating, simulatedApachePoints, simulatedNodePoints, apacheData, nodeData]);
+  const displayApachePoints = apacheData;
+  const displayNodePoints = nodeData;
 
   return (
     <div>
