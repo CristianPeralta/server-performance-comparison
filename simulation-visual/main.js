@@ -308,17 +308,17 @@ function SimulationAnim({ server }) {
     return () => unsubscribe();
   }, [server]);
 
-  // Simulated latency to make the animation more visible
-  const fakeLatency = 0.5; // Adjust as needed for visibility
-  // requests: array of {time, status: 'ok'|'fail'}
-  // progress: 0..1
-  // server: 'apache' | 'node'
-  // Colors
+  // Animation configuration
   const color = server === 'apache' ? '#2563eb' : '#10b981';
   const icon = server === 'apache' ? '🧭' : '🚀';
   const serverLabel = server === 'apache' ? 'Apache' : 'Node.js';
-  // Only shows the messages that have "arrived" according to progress
-  const shown = requests.filter(r => r.time <= progress * timeTaken);
+  
+  // Animation speed factor (higher = slower animation)
+  const ANIMATION_SPEED_FACTOR = 0.3; // Reduce la velocidad a 30% de la velocidad original
+  
+  // Calculate animation state based on current progress and requests
+  const currentTime = (progress * timeTaken) * ANIMATION_SPEED_FACTOR;
+  
   return (
     <div className="simulation-anim">
       <svg className="simulation-svg" viewBox="0 0 440 160">
@@ -333,24 +333,50 @@ function SimulationAnim({ server }) {
           <text x="375" y="88" textAnchor="middle" fontSize="28" fill="#fff">{icon}</text>
         </g>
         {/* Messages */}
-        {shown.map((r,i) => {
-          const frac = Math.min(1, Math.max(0, (progress * timeTaken - r.time) / (r.latency || fakeLatency)));
-          const x = 50 + (290 * frac);
-          const y = 80 + (Math.sin(i*0.7)*15);
-          return (
-            <g key={i}>
-              {/* Message */}
-              <circle cx={x} cy={y} r="10" fill={r.status==='ok'?color:'#ef4444'} opacity={0.93} />
-              <text x={x} y={y+5} textAnchor="middle" fontSize="16" fill="#fff">💬</text>
-              {/* Response */}
-              {frac===1 && (
-                <text x={x+30} y={y+5} fontSize="18" fill={r.status==='ok'?"#10b981":"#ef4444"}>
-                  {r.status==='ok'?'✅':'❌'}
+        {requests
+          .filter(r => r.time <= currentTime) // Only show requests that should have started
+          .map((r, i) => {
+            // Calculate animation progress (0 to 1) for each request
+            const requestProgress = Math.min(1, Math.max(0, (currentTime - r.time) / (r.latency || 0.5)));
+            const x = 50 + (290 * requestProgress);
+            const y = 80 + (Math.sin(i * 0.7) * 15);
+            
+            return (
+              <g key={`${server}-${i}`}>
+                {/* Message bubble */}
+                <circle 
+                  cx={x} 
+                  cy={y} 
+                  r="10" 
+                  fill={r.status === 'ok' ? color : '#ef4444'} 
+                  opacity={0.9 - (requestProgress * 0.3)} // Fade out as it reaches server
+                />
+                <text 
+                  x={x} 
+                  y={y + 5} 
+                  textAnchor="middle" 
+                  fontSize="16" 
+                  fill="#fff"
+                  opacity={0.9 - (requestProgress * 0.3)}
+                >
+                  💬
                 </text>
-              )}
-            </g>
-          );
-        })}
+                
+                {/* Response indicator */}
+                {requestProgress > 0.9 && (
+                  <text 
+                    x={x + 30} 
+                    y={y + 5} 
+                    fontSize="18" 
+                    fill={r.status === 'ok' ? "#10b981" : "#ef4444"}
+                    opacity={(requestProgress - 0.9) * 10} // Fade in response
+                  >
+                    {r.status === 'ok' ? '✅' : '❌'}
+                  </text>
+                )}
+              </g>
+            );
+          })}
       </svg>
       <div className="timeline-bar">
         <div className={`timeline-progress${server==='node'?' node':''}`} style={{width: `${progress*100}%`}}></div>
