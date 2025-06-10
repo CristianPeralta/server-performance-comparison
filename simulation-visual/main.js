@@ -82,19 +82,24 @@ function useDynamicMetrics(loadTestingTool = 'jmeter') {
 
 // --- Components ---
 // Super tab for selecting load testing tool
-function LoadTestingToolTabs({ loadTestingTool, setLoadTestingTool }) {
+function LoadTestingToolTabs({ loadTestingTool, setLoadTestingTool, onChange }) {
+  const handleToolChange = (newTool) => {
+    if (onChange) onChange();
+    setLoadTestingTool(newTool);
+  };
+
   return (
     <div className="super-tabs" style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
       <button
         className={`super-tab${loadTestingTool === 'jmeter' ? ' active' : ''}`}
-        onClick={() => setLoadTestingTool('jmeter')}
+        onClick={() => handleToolChange('jmeter')}
         style={{marginRight: 8, padding: '6px 18px', borderRadius: 5, border: '1px solid #d1d5db', background: loadTestingTool==='jmeter' ? '#e0e7ff' : '#f1f5f9', color: loadTestingTool==='jmeter' ? '#1e293b' : '#64748b', fontWeight: loadTestingTool==='jmeter' ? 600 : 400}}
       >
         JMeter
       </button>
       <button
         className={`super-tab${loadTestingTool === 'ab' ? ' active' : ''}`}
-        onClick={() => setLoadTestingTool('ab')}
+        onClick={() => handleToolChange('ab')}
         style={{padding: '6px 18px', borderRadius: 5, border: '1px solid #d1d5db', background: loadTestingTool==='ab' ? '#e0e7ff' : '#f1f5f9', color: loadTestingTool==='ab' ? '#1e293b' : '#64748b', fontWeight: loadTestingTool==='ab' ? 600 : 400}}
       >
         ab
@@ -581,10 +586,19 @@ function App() {
     }
   }, [running, loadTestingTool, apache, node]);
 
+  const handleToolChange = () => {
+    // Stop the simulation when changing tools
+    setRunning(false);
+  };
+
   return (
     <div className="simulation-container">
       <h2 style={{textAlign:'center',marginTop:0}}>Simulation Visual: Apache vs Node.js</h2>
-      <LoadTestingToolTabs loadTestingTool={loadTestingTool} setLoadTestingTool={setLoadTestingTool} />
+      <LoadTestingToolTabs 
+        loadTestingTool={loadTestingTool} 
+        setLoadTestingTool={setLoadTestingTool} 
+        onChange={handleToolChange}
+      />
       <Tabs tab={tab} setTab={setTab} />
       <PlayStop running={running} onPlay={()=>setRunning(true)} onStop={()=>setRunning(false)} />
       <SimulationPanel tab={tab}/>
