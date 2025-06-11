@@ -384,7 +384,7 @@ function SimulationAnim({ server }) {
           })}
       </svg>
       <div className="timeline-bar">
-        <div className={`timeline-progress${server==='node'?' node':''}`} style={{width: `${progress*100}%`}}></div>
+        <div className={`timeline-progress${server==='node'?' node':''}`} style={{width: `${Math.round(progress*100)}%`}}></div>
       </div>
       <div className="sim-labels">
         <span>0s</span>
@@ -521,11 +521,14 @@ function App() {
   React.useEffect(() => {
     if (running) {
       let cancelled = false;
-      let intervalApache, intervalNode;
-
+      let animationFrameId;
+      let startTime;
+      let apacheRequests = [];
+      let nodeRequests = [];
+      const totalApache = apache.timeTaken || 0.01; // Evitar división por cero
+      const totalNode = node.timeTaken || 0.01;
+      
       const fetchAndSimulate = async () => {
-        let apacheRequests = [];
-        let nodeRequests = [];
         if (loadTestingTool === 'jmeter') {
           apacheRequests = await generateRequestsJmeter('apache');
           nodeRequests = await generateRequestsJmeter('node');
@@ -536,52 +539,54 @@ function App() {
 
         if (cancelled) return;
 
-        let iApache = 0, iNode = 0;
-        const totalApache = apache.timeTaken || 60;
-        const totalNode = node.timeTaken || 60;
+        startTime = Date.now();
         
-        let sharedData = {
-          apachePoints: [], nodePoints: [],
-          apacheRequests: [], nodeRequests: [],
-          progressApache: 0, progressNode: 0,
-        };
-
-        const publishSharedData = () => {
+        const animate = () => {
           if (cancelled) return;
+          
+          const currentTime = (Date.now() - startTime) / 1000; // Tiempo transcurrido en segundos
+          
+          // Calcular progreso basado en el tiempo real
+          const progressApache = Math.min(1, currentTime / totalApache);
+          const progressNode = Math.min(1, currentTime / totalNode);
+          
+          // Filtrar solicitudes que deberían haberse mostrado hasta ahora
+          const currentApacheTime = progressApache * totalApache;
+          const currentApacheRequests = apacheRequests.filter(req => req.time <= currentApacheTime);
+          
+          const currentNodeTime = progressNode * totalNode;
+          const currentNodeRequests = nodeRequests.filter(req => req.time <= currentNodeTime);
+          
+          // Publicar el estado actual
           pubsub.publish('simulation:data', {
             mode: 'dynamic',
-            ...sharedData,
+            apachePoints: currentApacheRequests.map(req => ({ x: req.time, y: req.latency })),
+            nodePoints: currentNodeRequests.map(req => ({ x: req.time, y: req.latency })),
             apacheMetrics: apache,
             nodeMetrics: node,
+            apacheRequests: currentApacheRequests,
+            nodeRequests: currentNodeRequests,
+            progressApache,
+            progressNode,
           });
+          
+          // Continuar la animación si no hemos terminado
+          if (progressApache < 1 || progressNode < 1) {
+            animationFrameId = requestAnimationFrame(animate);
+          } else {
+            // La simulación ha terminado
+            setRunning(false);
+          }
         };
-
-        intervalApache = setInterval(() => {
-          if (cancelled) { clearInterval(intervalApache); return; }
-          iApache++;
-          sharedData.progressApache = Math.min(1, iApache / apacheRequests.length);
-          sharedData.apachePoints = apacheRequests.slice(0, iApache).map(req => ({ x: req.time, y: req.latency }));
-          sharedData.apacheRequests = apacheRequests.slice(0, iApache);
-          publishSharedData();
-          if (iApache >= apacheRequests.length) clearInterval(intervalApache);
-        }, totalApache * 1000 / (apacheRequests.length || 1));
-
-        intervalNode = setInterval(() => {
-          if (cancelled) { clearInterval(intervalNode); return; }
-          iNode++;
-          sharedData.progressNode = Math.min(1, iNode / nodeRequests.length);
-          sharedData.nodePoints = nodeRequests.slice(0, iNode).map(req => ({ x: req.time, y: req.latency }));
-          sharedData.nodeRequests = nodeRequests.slice(0, iNode);
-          publishSharedData();
-          if (iNode >= nodeRequests.length) clearInterval(intervalNode);
-        }, totalNode * 1000 / (nodeRequests.length || 1));
+        
+        // Iniciar la animación
+        animationFrameId = requestAnimationFrame(animate);
       };
 
       fetchAndSimulate();
       return () => {
         cancelled = true;
-        if (intervalApache) clearInterval(intervalApache);
-        if (intervalNode) clearInterval(intervalNode);
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
       };
     }
   }, [running, loadTestingTool, apache, node]);
