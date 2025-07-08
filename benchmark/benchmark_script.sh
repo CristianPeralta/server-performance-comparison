@@ -111,7 +111,11 @@ if [[ "$MODE" == "ab" ]]; then
   cp results/ab/laravel_ab_simple.csv ../simulation-visual/data/ab/laravel_ab_simple.csv
   cp results/ab/node_ab_simple.csv ../simulation-visual/data/ab/node_ab_simple.csv
   cp results/ab/summary.txt ../simulation-visual/data/ab/summary.txt
+  cp results/ab/laravel_usage.csv ../simulation-visual/data/ab/laravel_usage.csv
+  cp results/ab/node_usage.csv ../simulation-visual/data/ab/node_usage.csv
 else
   cp results/jmeter/laravel_jmeter.csv ../simulation-visual/data/jmeter/laravel_jmeter.csv
   cp results/jmeter/node_jmeter.csv ../simulation-visual/data/jmeter/node_jmeter.csv
+  cp results/jmeter/laravel_usage.csv ../simulation-visual/data/jmeter/laravel_usage.csv
+  cp results/jmeter/node_usage.csv ../simulation-visual/data/jmeter/node_usage.csv
 fi
