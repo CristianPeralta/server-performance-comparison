@@ -33,48 +33,6 @@ analyze_usage() {
   fi
 }
 
-# Test function
-test_analyze_usage() {
-  # Create test file
-  echo "cpu,memory" > test_usage.csv
-  echo "75.62%,0.50%" >> test_usage.csv
-  echo "0.00%,0.17%" >> test_usage.csv
-  echo "0.00%,0.00%" >> test_usage.csv
-  echo "0.00%,0.00%" >> test_usage.csv
-  
-  # Run analysis
-  echo "Testing analyze_usage with test data..."
-  analyze_usage test_usage.csv
-  
-  # Clean up
-  rm test_usage.csv
-}
-
-# If running this script directly, run tests
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  test_analyze_usage
-fi
-
-
-# Function to monitor container resource usage
-monitor_container() {
-  # (original function, no changes)
-  local container_name=$1
-  local outfile=$2
-  echo "cpu,memory" > $outfile
-
-  local start_time=$(date +%s)
-  echo "Monitoring container $container_name for $DURATION seconds..."
-  local end_time=$((start_time + DURATION + 5))
-  local now=$start_time
-
-  while [ $now -lt $end_time ]; do
-    docker stats --no-stream --format "{{.CPUPerc}},{{.MemPerc}}" $container_name >> $outfile
-    sleep 1
-    now=$(date +%s)
-  done
-}
-
 # Function to monitor container resource usage while a PID is alive
 # Usage:
 #   run_benchmark ... &
@@ -98,7 +56,7 @@ monitor_container_until_pid_exit() {
   # Capture while the process is alive
   while kill -0 $pid_to_watch 2>/dev/null; do
     docker stats --no-stream --format "{{.CPUPerc}},{{.MemPerc}}" $container_name >> $outfile
-    sleep 1
+    ## sleep 1
   done
 }
 
