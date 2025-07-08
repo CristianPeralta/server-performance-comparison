@@ -61,8 +61,8 @@ fi
 echo "Generating summary..."
 SUMMARY_FILE_AB="results/ab/summary.txt"
 SUMMARY_FILE_JMETER="results/jmeter/summary.txt"
-SUMMARY_JSON_JMETER="../simulation-visual/jmeter/summary.json"
-SUMMARY_JSON_AB="../simulation-visual/ab/summary.json"
+SUMMARY_JSON_JMETER="../simulation-visual/data/jmeter/summary.json"
+SUMMARY_JSON_AB="../simulation-visual/data/ab/summary.json"
 if [[ "$MODE" == "ab" ]]; then
   : > $SUMMARY_FILE_AB
 else
@@ -104,4 +104,14 @@ if [[ "$MODE" == "ab" ]]; then
 else
   cat $SUMMARY_FILE_JMETER
   echo "Summary saved to $SUMMARY_FILE_JMETER"
+fi
+
+## Copy results to simulation-visual/data/ab and simulation-visual/data/
+if [[ "$MODE" == "ab" ]]; then 
+  cp results/ab/laravel_ab_simple.csv ../simulation-visual/data/ab/laravel_ab_simple.csv
+  cp results/ab/node_ab_simple.csv ../simulation-visual/data/ab/node_ab_simple.csv
+  cp results/ab/summary.txt ../simulation-visual/data/ab/summary.txt
+else
+  cp results/jmeter/laravel_jmeter.csv ../simulation-visual/data/jmeter/laravel_jmeter.csv
+  cp results/jmeter/node_jmeter.csv ../simulation-visual/data/jmeter/node_jmeter.csv
 fi
