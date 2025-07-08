@@ -43,7 +43,7 @@ monitor_container_until_pid_exit() {
   local container_name=$1
   local outfile=$2
   local pid_to_watch=$3
-  echo "cpu,memory" > $outfile
+  echo "timestamp,cpu,memory" > $outfile
 
   # Wait for the process to really exist (max 1 second)
   for i in {1..10}; do
@@ -55,7 +55,8 @@ monitor_container_until_pid_exit() {
 
   # Capture while the process is alive
   while kill -0 $pid_to_watch 2>/dev/null; do
-    docker stats --no-stream --format "{{.CPUPerc}},{{.MemPerc}}" $container_name >> $outfile
+    ts=$(date +%s)
+    docker stats --no-stream --format "$ts,{{.CPUPerc}},{{.MemPerc}}" $container_name >> $outfile
     ## sleep 1
   done
 }
